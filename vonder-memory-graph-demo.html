@@ -652,6 +652,25 @@ function focusCategory(cat){
   controls.minDistance = Math.min(controls.minDistance, dist * 0.9);
   const dir = cat.pos.length() > 1 ? cat.pos.clone().normalize() : new THREE.Vector3(0.3, 0.4, 1).normalize();
   dir.y += 0.18; dir.normalize();                        // slight top-down baked into the unit dir → |dest−cat| stays = dist
+
+  // Cap the view swing. The canonical viewpoint above sits radially OUTSIDE the category, facing
+  // the graph centre — flying there from the opposite side means the view wraps ~180° in the last
+  // stretch of the tween. So: rotate the CURRENT approach direction at most MAX_SWING toward the
+  // canonical one and park there instead (same `dist`, so the category still reads the same size).
+  // Near-side taps are unaffected (their angle is already under the cap); far-side taps approach
+  // from where the camera already is, even if that viewpoint doesn't face the graph centre.
+  const MAX_SWING = Math.PI / 3;                         // ≤60° of orbit per category tap
+  const fromDir = camera.position.clone().sub(cat.pos);
+  if (fromDir.lengthSq() > 1){
+    fromDir.normalize();
+    const ang = fromDir.angleTo(dir);
+    if (ang > MAX_SWING){
+      const axis = new THREE.Vector3().crossVectors(fromDir, dir);
+      if (axis.lengthSq() > 1e-6) axis.normalize();                       // great-circle toward canonical
+      else { axis.set(0, 1, 0); if (Math.abs(fromDir.y) > 0.95) axis.set(1, 0, 0); }  // antipodal → yaw around
+      dir.copy(fromDir).applyQuaternion(new THREE.Quaternion().setFromAxisAngle(axis, MAX_SWING));
+    }
+  }
   const dest = cat.pos.clone().addScaledVector(dir, dist);
   startTween(dest, cat.pos.clone());
 
