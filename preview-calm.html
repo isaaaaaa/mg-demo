@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" id="themeColor" content="#0e0f12" />
+<title>Vonder · Memory Graph — calm preview</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; height:100%; width:100%; overflow:hidden; overscroll-behavior:none;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Helvetica Neue", sans-serif; }
+  #scene { position:fixed; inset:0; touch-action:none; }
+  #labels { position:fixed; inset:0; pointer-events:none; overflow:hidden; }
+
+  /* constant-size capsules — themed via body class */
+  .cap { pointer-events:none; white-space:nowrap; border-radius:999px; font-weight:500; user-select:none; line-height:1; }
+  .cap.node { font-size:11px; padding:4px 10px; letter-spacing:.1px; }
+  .cap.cat  { font-size:13px; font-weight:600; padding:6px 13px 6px 11px; display:flex; align-items:center; gap:7px; }
+  .cap.cat .dot { width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+  .cap.cat .cnt { font-weight:500; font-size:11px; opacity:.5; }
+
+  /* DARK calm */
+  html.theme-dark, body.theme-dark { background:#0e0f12; }
+  body.theme-dark .cap.node { color:#d7d4cc; background:rgba(28,30,35,.92); border:1px solid rgba(255,255,255,.08); }
+  body.theme-dark .cap.cat  { color:#f1eee6; background:rgba(20,22,27,.95); border:1px solid rgba(255,255,255,.14); box-shadow:0 4px 18px rgba(0,0,0,.45); }
+
+  /* LIGHT calm (#EFEEE9) */
+  html.theme-light, body.theme-light { background:#efeee9; }
+  body.theme-light .cap.node { color:#3a3c42; background:#fbfaf7; border:1px solid rgba(40,38,32,.14); box-shadow:0 1px 3px rgba(60,55,45,.10); }
+  body.theme-light .cap.cat  { color:#26282d; background:#ffffff; border:1px solid rgba(40,38,32,.16); box-shadow:0 4px 16px rgba(70,64,52,.16); }
+
+  #bar {
+    position:fixed; top:calc(env(safe-area-inset-top) + 12px); left:50%; transform:translateX(-50%);
+    z-index:20; display:flex; gap:3px; padding:3px; border-radius:12px;
+  }
+  body.theme-dark  #bar { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); }
+  body.theme-light #bar { background:rgba(255,255,255,.7);  border:1px solid rgba(40,38,32,.12); backdrop-filter:blur(8px); }
+  #bar button { border:0; background:transparent; font-family:inherit; font-size:12px; font-weight:600; padding:7px 16px; border-radius:9px; cursor:pointer; }
+  body.theme-dark  #bar button { color:#a9aab2; }
+  body.theme-light #bar button { color:#8a857a; }
+  #bar button.on { color:#fff; }
+  body.theme-dark  #bar button.on { background:#5b6b86; }
+  body.theme-light #bar button.on { background:#6f6a5f; }
+
+  #cap-note {
+    position:fixed; bottom:calc(env(safe-area-inset-bottom) + 14px); left:50%; transform:translateX(-50%);
+    z-index:20; font-size:11px; letter-spacing:.3px;
+  }
+  body.theme-dark  #cap-note { color:#6f717e; }
+  body.theme-light #cap-note { color:#a59f93; }
+  #loading { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; font-size:13px; z-index:40; }
+  body.theme-dark #loading { color:#6a6d80; } body.theme-light #loading { color:#9a948a; }
+</style>
+</head>
+<body class="theme-dark"><!-- html class set below -->
+  <canvas id="scene"></canvas>
+  <div id="labels"></div>
+  <div id="bar">
+    <button data-t="dark" class="on">Calm Dark</button>
+    <button data-t="light">Calm Light</button>
+  </div>
+  <div id="cap-note">drag to rotate · pinch to zoom · auto-rotating</div>
+  <div id="loading">loading…</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://esm.sh/three@0.160.0",
+  "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* ---------- calm themes ---------- */
+const THEMES = {
+  dark: {
+    bg: 0x0e0f12, stars: true, starColor: 0x3a3d48, starOpacity: 0.5,
+    line: 0x6f6480, lineOpacity: 0.22, emissive: 0.85,
+    cat:    { Person:'#8198bd', Organization:'#c08aa2', Place:'#82ac99', Others:'#9a9ca0' },
+    topics: ['#c0a875','#929ec8','#86b0a0','#c89a86','#a892b6','#8ab0c0','#c4b486','#9aa6c4'],
+  },
+  light: {
+    bg: 0xefeee9, stars: false, starColor: 0xcfcabd, starOpacity: 0.6,
+    line: 0x8a8170, lineOpacity: 0.28, emissive: 0.0,
+    cat:    { Person:'#566d92', Organization:'#8f5f78', Place:'#4f7d68', Others:'#86837c' },
+    topics: ['#9c8246','#5f6e9e','#4f8270','#a06a52','#7a5f8c','#5f8290','#8a7a3e','#566486'],
+  },
+};
+let theme = THEMES.dark, themeKey = 'dark';
+
+/* ---------- category derivation (same rules as the demo) ---------- */
+const TYPE_CAT = { Person:'Person', Organization:'Organization', Place:'Place' };
+const titleCase = s => s.charAt(0).toUpperCase() + s.slice(1);
+const displayName = key => (TYPE_CAT[key] || key === 'Others') ? key : titleCase(key);
+function deriveKey(n){
+  const t = n.entity_type;
+  if (TYPE_CAT[t]) return t;
+  if (t === 'Topic') return (n.attributes && n.attributes.category) || 'Others';
+  return 'Others';
+}
+function fibDir(idx, count){
+  const k = idx + 0.5, c = Math.max(-1, Math.min(1, 1 - 2*k/count));
+  const phi = Math.acos(c), th = Math.PI*(1+Math.sqrt(5))*k;
+  return new THREE.Vector3(Math.sin(phi)*Math.cos(th), Math.cos(phi), Math.sin(phi)*Math.sin(th));
+}
+const hash01 = s => { let h=2166136261; for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);} return ((h>>>0)%100000)/100000; };
+
+const UNIT = 60;
+let RAW = null;
+function parseSource(raw){
+  const groups = new Map();
+  (raw.nodes||[]).forEach(n => { const k = deriveKey(n); n._k = k; n._jit = hash01(n.id);
+    if(!groups.has(k)) groups.set(k, []); groups.get(k).push(n); });
+  const rank = k => k==='Others'?99:(TYPE_CAT[k]?0:1);
+  const keys = [...groups.keys()].sort((a,b)=>rank(a)-rank(b)||groups.get(b).length-groups.get(a).length);
+  const cats = keys.map(key => ({ key, name: displayName(key), nodes: groups.get(key), pos:null }));
+  const byId = new Map(); (raw.nodes||[]).forEach(n=>byId.set(n.id,n));
+  const edges = (raw.edges||[]).filter(e=>byId.has(e.source)&&byId.has(e.target)&&e.source!==e.target)
+                               .map(e=>({a:byId.get(e.source), b:byId.get(e.target)}));
+  return { cats, edges, allNodes: raw.nodes||[] };
+}
+function colorFor(cat, idx){ return theme.cat[cat.key] || theme.topics[idx % theme.topics.length]; }
+function layout(spread){
+  const N = RAW.cats.length, Rcat = UNIT*spread*(1.2+0.55*Math.sqrt(N));
+  let maxR = Rcat;
+  RAW.cats.forEach((cat,i)=>{
+    cat.pos = fibDir(i,N).clone().multiplyScalar(Rcat);
+    const dir = cat.pos.clone().normalize(), n = cat.nodes.length;
+    const rloc = UNIT*spread*(0.45+0.16*Math.sqrt(Math.max(n,1)));
+    cat.nodes.forEach((nd,j)=>{
+      const local = fibDir(j,n).multiplyScalar(rloc*(0.6+0.4*nd._jit));
+      nd.pos = cat.pos.clone().add(local).addScaledVector(dir, rloc*0.35);
+      maxR = Math.max(maxR, nd.pos.length());
+    });
+  });
+  return { Rcat, boundingRadius: maxR + UNIT };
+}
+
+/* ---------- scene ---------- */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth, innerHeight);
+const labelRenderer = new CSS2DRenderer({ element: document.getElementById('labels') });
+labelRenderer.setSize(innerWidth, innerHeight);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 1, 60000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08; controls.rotateSpeed = 0.6;
+controls.autoRotate = true; controls.autoRotateSpeed = 0.28;
+scene.add(new THREE.AmbientLight(0xffffff, 0.95));
+const dl = new THREE.DirectionalLight(0xffffff, 0.55); dl.position.set(1,1,1); scene.add(dl);
+
+const sphereGeo = new THREE.SphereGeometry(1, 16, 16);
+let group = new THREE.Group(); scene.add(group);
+let nodeLabels = [], catLabels = [], stars = null, boundingRadius = 500;
+
+function disposeGroup(){
+  group.traverse(o => { if (o instanceof CSS2DObject && o.element) o.element.remove();
+    if (o.geometry && o.geometry!==sphereGeo) o.geometry.dispose();
+    if (o.material) (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose()); });
+  scene.remove(group); group = new THREE.Group(); scene.add(group); nodeLabels=[]; catLabels=[];
+}
+function makeCap(cls){ const d=document.createElement('div'); d.className='cap '+cls; return d; }
+
+function build(){
+  disposeGroup();
+  scene.background = new THREE.Color(theme.bg);
+  scene.fog = new THREE.FogExp2(theme.bg, 0.0007);
+  RAW.cats.forEach((c,i)=> c.color = colorFor(c,i));
+  RAW.cats.forEach(c => c.nodes.forEach(n => n.color = c.color));
+
+  // relationship lines
+  const pts = [];
+  RAW.edges.forEach(e => pts.push(e.a.pos.x,e.a.pos.y,e.a.pos.z, e.b.pos.x,e.b.pos.y,e.b.pos.z));
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(pts,3));
+  group.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color:theme.line, transparent:true, opacity:theme.lineOpacity })));
+  // hierarchy lines (very soft)
+  const hp = [];
+  RAW.cats.forEach(c => c.nodes.forEach(n => hp.push(c.pos.x,c.pos.y,c.pos.z, n.pos.x,n.pos.y,n.pos.z)));
+  const hg = new THREE.BufferGeometry(); hg.setAttribute('position', new THREE.Float32BufferAttribute(hp,3));
+  group.add(new THREE.LineSegments(hg, new THREE.LineBasicMaterial({ color:theme.line, transparent:true, opacity:theme.lineOpacity*0.4 })));
+
+  // nodes
+  RAW.allNodes.forEach(n => {
+    const col = new THREE.Color(n.color);
+    const mat = new THREE.MeshBasicMaterial({ color:col });   // flat & unlit — no shading on the dot
+    const m = new THREE.Mesh(sphereGeo, mat); m.position.copy(n.pos); m.scale.setScalar(2.6); group.add(m);
+    const cap = makeCap('node'); cap.textContent = n.name;
+    const lbl = new CSS2DObject(cap); lbl.center.set(0.5,0.5); m.add(lbl);
+    nodeLabels.push({ lbl, mesh:m, el:cap, w:null, h:null, op:0, on:false });
+  });
+  // categories
+  RAW.cats.forEach(c => {
+    const col = new THREE.Color(c.color);
+    const mat = new THREE.MeshBasicMaterial({ color:col });   // flat & unlit
+    const m = new THREE.Mesh(sphereGeo, mat); m.position.copy(c.pos); m.scale.setScalar(5.5); group.add(m);
+    const cap = makeCap('cat');
+    const dot=document.createElement('span'); dot.className='dot'; dot.style.background=c.color;
+    const nm=document.createElement('span'); nm.textContent=c.name;
+    const cnt=document.createElement('span'); cnt.className='cnt'; cnt.textContent=c.nodes.length;
+    cap.append(dot,nm,cnt);
+    const lbl = new CSS2DObject(cap); lbl.center.set(0.5,0.5); m.add(lbl);
+    catLabels.push({ lbl, mesh:m, el:cap, w:null, h:null, op:0, on:false });
+  });
+
+  // starfield (dark only)
+  if (stars){ scene.remove(stars); stars.geometry.dispose(); stars.material.dispose(); stars=null; }
+  if (theme.stars){
+    const g=new THREE.BufferGeometry(), N=900, a=new Float32Array(N*3);
+    for(let i=0;i<N;i++){ const r=6000+Math.random()*10000, t=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+      a[i*3]=r*Math.sin(ph)*Math.cos(t); a[i*3+1]=r*Math.cos(ph); a[i*3+2]=r*Math.sin(ph)*Math.sin(t); }
+    g.setAttribute('position', new THREE.BufferAttribute(a,3));
+    stars = new THREE.Points(g, new THREE.PointsMaterial({ color:theme.starColor, size:13, sizeAttenuation:true, transparent:true, opacity:theme.starOpacity }));
+    scene.add(stars);
+  }
+}
+
+function fit(){
+  const vFov = camera.fov*Math.PI/180;
+  const hFov = 2*Math.atan(Math.tan(vFov/2)*Math.min(1, camera.aspect));
+  const dist = (boundingRadius/Math.sin(Math.min(vFov,hFov)/2)) * 0.92;
+  controls.target.set(0,0,0);
+  camera.position.copy(new THREE.Vector3(0.3,0.4,1).normalize().multiplyScalar(dist));
+  controls.minDistance = boundingRadius*0.25; controls.maxDistance = dist*1.2;
+  controls.update();
+}
+
+/* ---------- non-overlap + depth cull (always show nodes here) ---------- */
+const grid = (function(cell){ const map=new Map();
+  const cells=(r,fn)=>{const x0=Math.floor(r.x/cell),x1=Math.floor((r.x+r.w)/cell),y0=Math.floor(r.y/cell),y1=Math.floor((r.y+r.h)/cell);
+    for(let cx=x0;cx<=x1;cx++)for(let cy=y0;cy<=y1;cy++)fn(cx*73856+cy);};
+  return { clear(){map.clear();}, insert(r){cells(r,k=>{let a=map.get(k);if(!a){a=[];map.set(k,a);}a.push(r);});},
+    hits(r){let b=false;cells(r,k=>{const a=map.get(k);if(a&&!b)for(const o of a){if(r.x<o.x+o.w&&r.x+r.w>o.x&&r.y<o.y+o.h&&r.y+r.h>o.y){b=true;break;}}});return b;} };
+})(80);
+const tmp=new THREE.Vector3(), wp=new THREE.Vector3(), scr={x:0,y:0};
+let lastDecide=-1e9; const lastCam=new THREE.Vector3(1e9,0,0);
+function measure(it){ if(it.w!=null)return true; const w=it.el.offsetWidth; if(w>0){it.w=w;it.h=it.el.offsetHeight;return true;} return false; }
+function project(){ tmp.copy(wp).project(camera); if(tmp.z>1)return false;
+  scr.x=(tmp.x*.5+.5)*innerWidth; scr.y=(-tmp.y*.5+.5)*innerHeight;
+  return scr.x>-80&&scr.x<innerWidth+80&&scr.y>-60&&scr.y<innerHeight+60; }
+function decide(){
+  grid.clear();
+  const center = camera.position.distanceTo(controls.target);
+  const cut = center + boundingRadius*0.05;        // front hemisphere only
+  const nodes = nodeLabels.slice();
+  nodes.forEach(it=>{ it.mesh.getWorldPosition(wp); it._d2=wp.distanceToSquared(camera.position); });
+  nodes.sort((a,b)=>a._d2-b._d2);
+  let pend=false;
+  for (const it of [...catLabels, ...nodes]){
+    const isCat = catLabels.includes(it);
+    it.mesh.getWorldPosition(wp);
+    const d = wp.distanceTo(camera.position);
+    if (d > (isCat ? center + boundingRadius*0.35 : cut)) { it.on=false; continue; }
+    if (!measure(it)) { it.on=true; pend=true; continue; }
+    if (!project()) { it.on=false; continue; }
+    const pad = it.on?5:14;
+    const r = { x:scr.x-it.w/2-pad, y:scr.y-it.h/2-pad, w:it.w+2*pad, h:it.h+2*pad };
+    if (!grid.hits(r)){ it.on=true; grid.insert({x:scr.x-it.w/2-5,y:scr.y-it.h/2-5,w:it.w+10,h:it.h+10}); }
+    else it.on=false;
+  }
+  return pend;
+}
+let pending=false;
+function fade(it){ const t=it.on?1:0; it.op+=(t-it.op)*0.08;
+  if(it.on||it.op>0.02){ if(!it.lbl.visible)it.lbl.visible=true; it.el.style.opacity=it.op.toFixed(3); }
+  else if(it.lbl.visible) it.lbl.visible=false; }
+function loop(){
+  requestAnimationFrame(loop);
+  controls.autoRotate = !pointerDown; controls.update();
+  const now=performance.now();
+  if (pending || camera.position.distanceToSquared(lastCam)>0.0001){
+    if (pending || now-lastDecide>120){ lastDecide=now; lastCam.copy(camera.position); pending=decide(); }
+  }
+  for(const it of nodeLabels) fade(it); for(const it of catLabels) fade(it);
+  renderer.render(scene,camera); labelRenderer.render(scene,camera);
+}
+let pointerDown=false;
+canvas.addEventListener('pointerdown',()=>pointerDown=true);
+addEventListener('pointerup',()=>pointerDown=false);
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); labelRenderer.setSize(innerWidth,innerHeight); pending=true; });
+
+/* ---------- theme switch ---------- */
+document.querySelectorAll('#bar button').forEach(b => b.addEventListener('click', () => {
+  themeKey = b.dataset.t; theme = THEMES[themeKey];
+  document.documentElement.className = 'theme-' + themeKey;
+  document.body.className = 'theme-' + themeKey;
+  document.getElementById('themeColor').setAttribute('content', themeKey === 'light' ? '#efeee9' : '#0e0f12');
+  document.querySelectorAll('#bar button').forEach(x=>x.classList.toggle('on', x===b));
+  build(); pending = true;
+}));
+
+/* ---------- boot (Light dataset for a clean look) ---------- */
+fetch('mockdata_light.md')
+  .then(r => r.text())
+  .then(t => {
+    RAW = parseSource(JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}')+1)));
+    const L = layout(1.0); boundingRadius = L.boundingRadius;
+    build(); fit();
+    document.getElementById('loading').style.display='none';
+    loop();
+  })
+  .catch(err => { document.getElementById('loading').textContent = 'Failed to load mockdata_light.md — ' + err.message; });
+</script>
+</body>
+</html>

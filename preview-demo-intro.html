@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" id="themeColor" content="#0e0f12" />
+<title>Vonder · Memory Graph (Topic) — 3D demo</title>
+<style>
+  :root {
+    --bg0: #06070d;
+    --bg1: #0c1020;
+    --ink: #14161c;
+    --sheet: #f4f2ee;
+    --accent: #7d8aa8;
+    --amber: #e08a37;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; width: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Helvetica Neue", sans-serif;
+    color: #e9eaf0;
+    overscroll-behavior: none;
+  }
+  #scene { position: fixed; inset: 0; touch-action: none; }
+  #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; transition: opacity .7s ease; }
+
+  /* ---- constant-size text capsules ---- */
+  .cap {
+    pointer-events: none;
+    white-space: nowrap;
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+    font-weight: 500;
+    user-select: none;
+    line-height: 1;
+  }
+  .cap.node { font-size: 11px; padding: 4px 10px; letter-spacing: .1px; }
+  .cap.cat  { font-size: 13px; font-weight: 600; padding: 6px 13px 6px 11px; display: flex; align-items: center; gap: 7px; }
+  .cap.cat .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .cap.cat .cnt { font-weight: 500; font-size: 11px; opacity: .5; }
+  .cap.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* calm dark */
+  html.theme-dark, body.theme-dark { background: #0e0f12; }
+  body.theme-dark .cap.node { color:#d7d4cc; background:rgba(28,30,35,.92); border:1px solid rgba(255,255,255,.08); }
+  body.theme-dark .cap.cat  { color:#f1eee6; background:rgba(20,22,27,.95); border:1px solid rgba(255,255,255,.14); box-shadow:0 4px 18px rgba(0,0,0,.45); }
+  /* calm light (#EFEEE9) */
+  html.theme-light, body.theme-light { background: #efeee9; }
+  body.theme-light .cap.node { color:#3a3c42; background:#fbfaf7; border:1px solid rgba(40,38,32,.14); box-shadow:0 1px 3px rgba(60,55,45,.10); }
+  body.theme-light .cap.cat  { color:#26282d; background:#ffffff; border:1px solid rgba(40,38,32,.16); box-shadow:0 4px 16px rgba(70,64,52,.16); }
+
+  /* ---- control panel ---- */
+  #panel {
+    position: fixed; top: 0; left: 0; right: 0;
+    padding: calc(env(safe-area-inset-top) + 54px) 12px 12px;
+    background: linear-gradient(180deg, rgba(6,7,13,.92), rgba(6,7,13,0));
+    z-index: 20; transition: transform .28s ease;
+  }
+  #datasetTabs {
+    position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 50%; transform: translateX(-50%);
+    z-index: 28; display: flex; gap: 2px; padding: 3px;
+    background: rgba(12,16,32,.72); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px; backdrop-filter: blur(8px);
+  }
+  #datasetTabs button {
+    border: 0; background: transparent; color: #aeb1c0; font-family: inherit;
+    font-size: 12px; font-weight: 600; padding: 7px 16px; border-radius: 9px; cursor: pointer;
+  }
+  #datasetTabs button.on { background: var(--accent); color: #fff; }
+  #panel.hidden { transform: translateY(-102%); }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .seg { display: flex; background: rgba(255,255,255,.06); border-radius: 11px; padding: 3px; gap: 2px; }
+  .seg button {
+    border: 0; background: transparent; color: #aeb1c0;
+    font-size: 12px; font-weight: 600; padding: 7px 10px; border-radius: 9px;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .sliders { margin-top: 9px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .sl { display: flex; flex-direction: column; gap: 3px; }
+  .sl label { font-size: 10.5px; letter-spacing: .4px; text-transform: uppercase; color: #8d90a0; display: flex; justify-content: space-between; }
+  .sl label b { color: #d8d9e2; font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--accent); height: 22px; }
+  .toggles { margin-top: 9px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    font-size: 11.5px; color: #c9cbd6; background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.08); border-radius: 9px; padding: 6px 10px; cursor: pointer; user-select: none;
+  }
+  .chip.on { background: rgba(176,107,255,.22); border-color: rgba(176,107,255,.6); color: #fff; }
+
+  #hud {
+    margin-top: 9px; font-size: 11px; color: #8e91a2; line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+  }
+  #hud b { color: #cfd1dc; font-weight: 600; }
+
+  #toggleBtn {
+    position: fixed; top: calc(env(safe-area-inset-top) + 10px); right: 12px; z-index: 25;
+    width: 38px; height: 38px; border-radius: 11px; border: 1px solid rgba(255,255,255,.14);
+    background: rgba(12,16,32,.7); color: #d8d9e2; font-size: 17px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; backdrop-filter: blur(6px);
+  }
+
+  #hint {
+    position: fixed; bottom: calc(env(safe-area-inset-bottom) + 12px); left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: #9a9db0; background: rgba(8,10,18,.55); padding: 7px 13px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.07); z-index: 15; transition: opacity .5s; text-align: center; max-width: 92vw;
+  }
+
+  /* ---- detail bottom sheet ---- */
+  #sheet {
+    position: fixed; left: 50%; bottom: 0; transform: translate(-50%, 110%);
+    width: 100%; max-width: 460px; z-index: 30;
+    background: var(--sheet); color: var(--ink);
+    border-radius: 22px 22px 0 0;
+    padding: 22px 22px calc(env(safe-area-inset-bottom) + 26px);
+    box-shadow: 0 -18px 50px rgba(0,0,0,.5);
+    transition: transform .34s cubic-bezier(.22,1,.36,1);
+    height: 42vh; overflow-y: auto;   /* fixed expand height (between 1/3 and 1/2) — never covers the tapped node */
+  }
+  #sheet.open { transform: translate(-50%, 0); }
+  #sheet .close {
+    position: absolute; top: 16px; right: 16px; width: 30px; height: 30px; border: 0; background: transparent;
+    font-size: 22px; color: #555; cursor: pointer; line-height: 1;
+  }
+  #sheet h1 {
+    font-family: Georgia, "Times New Roman", serif; font-weight: 600;
+    font-size: 23px; letter-spacing: .5px; text-transform: uppercase; margin: 2px 44px 22px 0; color: #1a1c22;
+    overflow-wrap: anywhere;
+  }
+  #sheet .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 22px; }
+  #sheet .mpill { font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px; display: flex; align-items: center; gap: 6px; background: #e7e4dd; color: #3a3c42; }
+  #sheet .mpill .swatch { width: 8px; height: 8px; border-radius: 50%; }
+  #sheet .secttl { font-size: 11px; letter-spacing: .8px; text-transform: uppercase; color: #6f717a; margin: 0 0 12px; }
+  #sheet .summary { font-size: 13.5px; color: #2a2c33; line-height: 1.55; white-space: pre-wrap; margin-bottom: 22px; }
+  #sheet .rel { margin-top: 2px; display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 22px; }
+  #sheet .rel .pill { font-size: 11.5px; background: #e7e4dd; color: #4a4c52; padding: 4px 10px; border-radius: 999px; max-width: 100%; overflow-wrap: anywhere; }
+  #sheet .rel .rpill { cursor: pointer; }
+  #sheet .rel .rpill:active { background: #d8d4cb; }
+  #sheet .zoombtn {
+    width: 100%; margin: 0 0 22px; padding: 11px; border: 0; border-radius: 12px; cursor: pointer;
+    background: var(--ink); color: #fff; font-family: inherit; font-size: 13px; font-weight: 600;
+  }
+  #sheet .nodelist { display: flex; flex-direction: column; }
+  #sheet .noderow {
+    display: flex; align-items: center; gap: 10px; padding: 11px 4px; cursor: pointer;
+    border-top: 1px solid rgba(0,0,0,.07);
+  }
+  #sheet .noderow:active { background: rgba(0,0,0,.04); }
+  #sheet .noderow .rdot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  #sheet .noderow .rname { flex: 1; font-size: 14px; color: #24262d; line-height: 1.35; overflow-wrap: anywhere; }
+  #sheet .noderow .rdeg { font-size: 11.5px; color: #9a9ca3; font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; }
+  #sheet .listhdr { display:flex; justify-content:space-between; align-items:baseline; font-size:11px; letter-spacing:.8px; text-transform:uppercase; color:#6f717a; margin:0 0 6px; }
+  #sheet .listhdr .hr { color:#9a9ca3; }
+
+  /* category legend chips */
+  .lchip { font-size: 11px; border-radius: 8px; padding: 4px 8px; display: flex; align-items: center; gap: 5px; }
+  body.theme-dark  .lchip { color:#c9cbd6; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); }
+  body.theme-light .lchip { color:#5a564e; background:rgba(40,38,32,.06); border:1px solid rgba(40,38,32,.12); }
+
+  /* light theme — keep the chrome light too so the whole background reads light */
+  body.theme-light #panel { background: linear-gradient(180deg, rgba(239,238,233,.96), rgba(239,238,233,0)); }
+  body.theme-light #datasetTabs,
+  body.theme-light #toggleBtn { background: rgba(255,255,255,.78); border-color: rgba(40,38,32,.14); color:#4a4640; }
+  body.theme-light #datasetTabs button { color:#8a857a; }
+  body.theme-light #datasetTabs button.on { color:#fff; }
+  body.theme-light #hint { background: rgba(255,255,255,.72); color:#7a756a; border-color: rgba(40,38,32,.12); }
+  body.theme-light .chip { background: rgba(40,38,32,.06); border-color: rgba(40,38,32,.12); color:#5a564e; }
+  body.theme-light .chip.on { background: rgba(125,138,168,.25); border-color: rgba(125,138,168,.6); color:#33373f; }
+  body.theme-light .seg { background: rgba(40,38,32,.06); }
+  body.theme-light .seg button { color:#8a857a; }
+  body.theme-light #hud, body.theme-light #hud b { color:#6f6a5f; }
+  body.theme-light .sl label { color:#8a857a; }
+  body.theme-light .sl label b { color:#4a4640; }
+
+  /* search */
+  #searchBtn {
+    position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 12px; z-index: 25;
+    width: 38px; height: 38px; border-radius: 11px; border: 1px solid rgba(255,255,255,.14);
+    background: rgba(12,16,32,.7); color: #d8d9e2; cursor: pointer; backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  body.theme-light #searchBtn { background: rgba(255,255,255,.78); border-color: rgba(40,38,32,.14); color: #4a4640; }
+  #search { position: fixed; inset: 0; z-index: 50; display: none; flex-direction: column; padding: calc(env(safe-area-inset-top) + 12px) 14px 0; }
+  #search.open { display: flex; }
+  body.theme-dark  #search { background: rgba(10,11,14,.97); }
+  body.theme-light #search { background: rgba(244,243,239,.98); }
+  #search .srow { display: flex; gap: 8px; align-items: center; }
+  #search input {
+    flex: 1; font-size: 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid; font-family: inherit; outline: none;
+  }
+  body.theme-dark  #search input { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); color: #e9eaf0; }
+  body.theme-light #search input { background: #fff; border-color: rgba(40,38,32,.16); color: #26282d; }
+  #search .scancel { border: 0; background: transparent; font-family: inherit; font-size: 14px; cursor: pointer; padding: 8px 6px; }
+  body.theme-dark  #search .scancel { color: #9aa0b5; }
+  body.theme-light #search .scancel { color: #8a857a; }
+  #searchResults { margin-top: 6px; overflow-y: auto; flex: 1; }
+  #search .sres { display: flex; align-items: center; gap: 10px; padding: 12px 4px; cursor: pointer; border-bottom: 1px solid; }
+  body.theme-dark  #search .sres { border-color: rgba(255,255,255,.06); }
+  body.theme-light #search .sres { border-color: rgba(40,38,32,.08); }
+  #search .sres .rdot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  #search .sres .rname { flex: 1; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.theme-dark  #search .sres .rname { color: #e3e1da; }
+  body.theme-light #search .sres .rname { color: #2a2c33; }
+  #search .sres .rcat { font-size: 11.5px; opacity: .65; white-space: nowrap; }
+  body.theme-dark  #search .sres .rcat { color: #9aa0b5; }
+  body.theme-light #search .sres .rcat { color: #8a857a; }
+  #search .sempty { padding: 18px 4px; font-size: 13px; opacity: .5; }
+
+  /* boot-animation variant switcher (preview only) */
+  #introBar {
+    position: fixed; bottom: calc(env(safe-area-inset-bottom) + 16px); left: 50%; transform: translateX(-50%);
+    z-index: 35; display: flex; gap: 2px; padding: 3px; align-items: center;
+    background: rgba(12,16,32,.72); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; backdrop-filter: blur(8px);
+  }
+  #introBar button {
+    border: 0; background: transparent; color: #aeb1c0; font-family: inherit;
+    font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 9px; cursor: pointer; white-space: nowrap;
+  }
+  #introBar button.on { background: var(--accent); color: #fff; }
+  #introBar .sep { width: 1px; height: 18px; background: rgba(255,255,255,.14); margin: 0 3px; }
+  #introBar .replay { color: #f1eee6; }
+  body.theme-light #introBar { background: rgba(255,255,255,.82); border-color: rgba(40,38,32,.14); }
+  body.theme-light #introBar button { color: #6f6a5f; }
+  body.theme-light #introBar button.on { color: #fff; }
+  body.theme-light #introBar .replay { color: #2a2c33; }
+
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #6a6d80; font-size: 13px; z-index: 40; pointer-events: none; }
+</style>
+</head>
+<body class="theme-dark">
+  <canvas id="scene"></canvas>
+  <div id="labels"></div>
+
+  <button id="toggleBtn">⚙</button>
+  <button id="searchBtn" aria-label="Search">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+  </button>
+  <div id="datasetTabs" style="display:none"></div>
+
+  <div id="search">
+    <div class="srow">
+      <input id="searchInput" type="text" placeholder="Search nodes…" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <button class="scancel" id="searchCancel">Cancel</button>
+    </div>
+    <div id="searchResults"></div>
+  </div>
+
+  <div id="panel" class="hidden">
+    <div class="row">
+      <div class="seg" id="presets"></div>
+    </div>
+    <div class="sliders">
+      <div class="sl">
+        <label>Initial zoom (fit) <b id="fitVal">0.50×</b></label>
+        <input type="range" id="fit" min="0.4" max="2.6" step="0.05" value="0.5" />
+      </div>
+      <div class="sl">
+        <label>Spread (spacing) <b id="spreadVal">1.0×</b></label>
+        <input type="range" id="spread" min="0.6" max="2.0" step="0.05" value="1.0" />
+      </div>
+    </div>
+    <div class="toggles">
+      <div class="chip on" id="lod">Prevent overlap</div>
+      <div class="chip on" id="rot">Auto-rotate</div>
+      <div class="chip" id="refit">Re-fit view</div>
+      <div class="seg" id="themeSeg" style="margin-left:auto">
+        <button data-th="dark" class="on">Dark</button>
+        <button data-th="light">Light</button>
+      </div>
+    </div>
+    <div id="hud"></div>
+  </div>
+
+  <div id="hint">1 finger rotate · 2 fingers pan · pinch zoom · tap a node for details · tap a category to focus</div>
+
+  <div id="introBar">
+    <button data-v="assemble" class="on">汇聚</button>
+    <button data-v="ripple">涟漪</button>
+    <button data-v="settle">沉降</button>
+    <button data-v="pullback">拉远</button>
+    <span class="sep"></span>
+    <button class="replay" id="replayBoot">↻ Replay</button>
+  </div>
+
+  <div id="sheet">
+    <button class="close" id="sheetClose">×</button>
+    <h1 id="sTitle"></h1>
+    <div id="sheetBody"></div>
+  </div>
+
+  <div id="loading">loading data…</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://esm.sh/three@0.160.0",
+    "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* ----------------------------------------------------------------------
+ * 1. Config — category derivation & colours
+ * -------------------------------------------------------------------- */
+const UNIT = 60;
+const DATASETS = [
+  { key:'light',  label:'Light',  url:'mockdata_light.md' },
+  { key:'medium', label:'Medium', url:'mockdata_medium.md' },
+  { key:'heavy',  label:'Heavy',  url:'mockdata_heavy.md' },
+];
+let curDataset = 'medium';
+
+// entity_type → category. Person/Organization/Place use the type name directly;
+// Topic uses its attributes.category; everything else (generic entities) → "Others".
+const TYPE_CAT = { Person:'Person', Organization:'Organization', Place:'Place' };
+function deriveCategoryKey(n){
+  const t = n.entity_type;
+  if (TYPE_CAT[t]) return t;
+  if (t === 'Topic') return (n.attributes && n.attributes.category) || 'Others';
+  return 'Others';
+}
+const titleCase = s => s.charAt(0).toUpperCase() + s.slice(1);
+function displayName(key){ return (TYPE_CAT[key] || key === 'Others') ? key : titleCase(key); }
+
+// calm "intelligence" palettes — muted, low-chroma. dark + light(#EFEEE9).
+const THEMES = {
+  dark: {
+    bg: 0x0e0f12, fog: 0.0008,
+    line: 0x6f6480, lineOpacity: 0.24, hierOpacity: 0.10,
+    nodeEmissive: 0.85, catEmissive: 0.95,
+    glow: true, glowOpacity: 0.30, glowBlend: THREE.AdditiveBlending,
+    star: true, starColor: 0x3a3d48, starOpacity: 0.5,
+    cat:    { Person:'#8198bd', Organization:'#c08aa2', Place:'#82ac99', Others:'#9a9ca0' },
+    topics: ['#c0a875','#929ec8','#86b0a0','#c89a86','#a892b6','#8ab0c0','#c4b486','#9aa6c4'],
+  },
+  light: {
+    bg: 0xefeee9, fog: 0.00055,
+    line: 0x8a8170, lineOpacity: 0.32, hierOpacity: 0.16,
+    nodeEmissive: 0.0, catEmissive: 0.0,
+    glow: false, glowOpacity: 0.0, glowBlend: THREE.NormalBlending,
+    star: false, starColor: 0xcfcabd, starOpacity: 0.0,
+    cat:    { Person:'#566d92', Organization:'#8f5f78', Place:'#4f7d68', Others:'#86837c' },
+    topics: ['#9c8246','#5f6e9e','#4f8270','#a06a52','#7a5f8c','#5f8290','#8a7a3e','#566486'],
+  },
+};
+let themeKey = 'dark', theme = THEMES.dark, lastRaw = null;
+
+// fibonacci point on the unit sphere (idx may be fractional; arg is clamped)
+function fibDir(idx, count){
+  const k = idx + 0.5;
+  const c = Math.max(-1, Math.min(1, 1 - 2 * k / count));
+  const phi = Math.acos(c);
+  const th  = Math.PI * (1 + Math.sqrt(5)) * k;
+  return new THREE.Vector3(Math.sin(phi)*Math.cos(th), Math.cos(phi), Math.sin(phi)*Math.sin(th));
+}
+// deterministic 0..1 from a string (stable per-node jitter)
+function hash01(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return ((h>>>0)%100000)/100000; }
+
+/* ----------------------------------------------------------------------
+ * 2. Parse the data source into categories + edges (run once on load)
+ * -------------------------------------------------------------------- */
+let RAW = null;   // { cats, edges:[{a,b}], allNodes, byId, groupId }
+
+function parseSource(raw){
+  const byId = new Map();
+  (raw.nodes || []).forEach(n => byId.set(n.id, n));
+
+  const groups = new Map();
+  (raw.nodes || []).forEach(n => {
+    const key = deriveCategoryKey(n);
+    n._catKey = key; n._jit = hash01(n.id);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(n);
+  });
+
+  // order: structural types first, then topic categories by size, Others last
+  const rank = k => k === 'Others' ? 99 : (TYPE_CAT[k] ? 0 : 1);
+  const keys = [...groups.keys()].sort((a,b) => rank(a)-rank(b) || groups.get(b).length-groups.get(a).length);
+  // place Person LAST → it lands on the −Y (bottom) fibonacci slot, so people sit low in space
+  const pIdx = keys.indexOf('Person');
+  if (pIdx >= 0) { keys.splice(pIdx, 1); keys.push('Person'); }
+
+  let ti = 0;
+  const cats = keys.map(key => {
+    const color = theme.cat[key] || theme.topics[ti++ % theme.topics.length];
+    const cat = { id:'c_'+key, key, name: displayName(key), color, nodes: groups.get(key), pos: null };
+    cat.nodes.forEach(n => { n.color = color; n.catName = cat.name; });
+    return cat;
+  });
+
+  const edges = (raw.edges || [])
+    .filter(e => byId.has(e.source) && byId.has(e.target) && e.source !== e.target)
+    .map(e => ({ a: byId.get(e.source), b: byId.get(e.target) }));
+
+  return { cats, edges, allNodes: raw.nodes || [], byId, groupId: raw.group_id };
+}
+
+/* ----------------------------------------------------------------------
+ * 3. Layout — analytic placement from the parsed data (positions only)
+ * -------------------------------------------------------------------- */
+function buildData(spread){
+  const numCats = RAW.cats.length;
+  const Rcat = UNIT * spread * (1.2 + 0.55 * Math.sqrt(numCats));
+  let maxRloc = 1;
+
+  RAW.cats.forEach((cat, i) => {
+    const dir = fibDir(i, numCats);
+    cat.pos = dir.clone().multiplyScalar(Rcat);
+    const n = cat.nodes.length;
+    const rloc = UNIT * spread * (0.45 + 0.16 * Math.sqrt(Math.max(n,1)));
+    cat.nodes.forEach((node, j) => {
+      const local = fibDir(j, n).multiplyScalar(rloc * (0.6 + 0.4 * node._jit));
+      node.pos = cat.pos.clone().add(local).addScaledVector(dir, rloc * 0.35);
+      maxRloc = Math.max(maxRloc, node.pos.distanceTo(cat.pos));
+    });
+  });
+
+  const relLinks = RAW.edges.map(e => [e.a, e.b]);
+  return { cats: RAW.cats, allNodes: RAW.allNodes, relLinks, Rcat, maxRloc };
+}
+
+/* ----------------------------------------------------------------------
+ * 4. Scene setup
+ * -------------------------------------------------------------------- */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+
+const labelRenderer = new CSS2DRenderer({ element: document.getElementById('labels') });
+labelRenderer.setSize(innerWidth, innerHeight);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(theme.bg);
+scene.fog = new THREE.FogExp2(theme.bg, theme.fog);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 1, 60000);
+camera.position.set(0, 0, 600);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.rotateSpeed = 0.6;
+controls.panSpeed = 0.8;
+controls.zoomSpeed = 0.9;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.35;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const dl = new THREE.DirectionalLight(0xffffff, 0.7); dl.position.set(1, 1, 1); scene.add(dl);
+const dl2 = new THREE.DirectionalLight(0x88aaff, 0.4); dl2.position.set(-1, -0.5, -1); scene.add(dl2);
+
+// themed starfield (rebuilt on theme change)
+let starPoints = null;
+function applyStars(){
+  if (starPoints){ scene.remove(starPoints); starPoints.geometry.dispose(); starPoints.material.dispose(); starPoints = null; }
+  if (!theme.star) return;
+  const g = new THREE.BufferGeometry(), N = 1200, a = new Float32Array(N*3);
+  for (let i=0;i<N;i++){ const r=6000+Math.random()*12000, t=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+    a[i*3]=r*Math.sin(ph)*Math.cos(t); a[i*3+1]=r*Math.cos(ph); a[i*3+2]=r*Math.sin(ph)*Math.sin(t); }
+  g.setAttribute('position', new THREE.BufferAttribute(a,3));
+  starPoints = new THREE.Points(g, new THREE.PointsMaterial({ color:theme.starColor, size:13, sizeAttenuation:true, transparent:true, opacity:theme.starOpacity }));
+  scene.add(starPoints);
+}
+
+// glow texture — loaded from ./halo.png so it can be hand-drawn / replaced.
+// (white art on transparent; it gets tinted with each node's colour.)
+const haloTex = new THREE.TextureLoader().load('halo.png');
+function addGlow(mesh, col, scale){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:haloTex, color:col, transparent:true, opacity:theme.glowOpacity, blending:theme.glowBlend, depthWrite:false }));
+  s.scale.setScalar(scale); mesh.add(s);
+}
+
+const sphereGeo = new THREE.SphereGeometry(1, 14, 14);
+const catGeo = new THREE.SphereGeometry(1, 20, 20);
+
+/* ----------------------------------------------------------------------
+ * 5. Build / dispose graph objects
+ * -------------------------------------------------------------------- */
+let graphGroup = new THREE.Group();
+scene.add(graphGroup);
+let nodeMeshes = [], catMeshes = [], nodeLabels = [], catLabels = [], boundingRadius = 500, maxRlocG = 100, currentData = null;
+
+function disposeGraph(){
+  graphGroup.traverse(o => {
+    if (o instanceof CSS2DObject && o.element) o.element.remove();
+    if (o.geometry && o.geometry !== sphereGeo && o.geometry !== catGeo) o.geometry.dispose();
+    if (o.material) { (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose()); }
+  });
+  scene.remove(graphGroup);
+  graphGroup = new THREE.Group(); scene.add(graphGroup);
+  nodeMeshes = []; catMeshes = []; nodeLabels = []; catLabels = [];
+  cullDirty = true;
+}
+
+function makeCap(text, cls){
+  const d = document.createElement('div');
+  d.className = 'cap ' + cls;
+  if (cls === 'cat') { d.innerHTML = ''; } // filled by caller
+  else d.textContent = text;
+  return d;
+}
+
+function buildGraph(data){
+  disposeGraph();
+  scene.background = new THREE.Color(theme.bg);
+  scene.fog = new THREE.FogExp2(theme.bg, theme.fog);
+  applyStars();
+
+  // --- hierarchy links (category -> node; loose nodes have none) ---
+  const hier = [];
+  data.cats.forEach(cat => cat.nodes.forEach(n => { hier.push(cat.pos.x,cat.pos.y,cat.pos.z, n.pos.x,n.pos.y,n.pos.z); }));
+  const hg = new THREE.BufferGeometry();
+  hg.setAttribute('position', new THREE.Float32BufferAttribute(hier,3));
+  graphGroup.add(new THREE.LineSegments(hg, new THREE.LineBasicMaterial({ color:theme.line, transparent:true, opacity:theme.hierOpacity })));
+
+  // --- relationship links (cross-category + loose-group internal) ---
+  const cross = [];
+  data.relLinks.forEach(([a,b]) => cross.push(a.pos.x,a.pos.y,a.pos.z, b.pos.x,b.pos.y,b.pos.z));
+  const cg = new THREE.BufferGeometry();
+  cg.setAttribute('position', new THREE.Float32BufferAttribute(cross,3));
+  graphGroup.add(new THREE.LineSegments(cg, new THREE.LineBasicMaterial({ color:theme.line, transparent:true, opacity:theme.lineOpacity })));
+
+  // --- nodes (grouped + loose) ---
+  data.allNodes.forEach(n => {
+    const col = new THREE.Color(n.color);
+    const mat = new THREE.MeshBasicMaterial({ color: col });   // flat & unlit — no light/shadow gradient on the dot
+    const mesh = new THREE.Mesh(sphereGeo, mat);
+    mesh.position.copy(n.pos); mesh.scale.setScalar(2.6);
+    mesh.userData = { type:'node', data:n };
+    graphGroup.add(mesh); nodeMeshes.push(mesh);
+    if (theme.glow) addGlow(mesh, col, 8);
+
+    const cap = makeCap(n.name, 'node');
+    const lbl = new CSS2DObject(cap);
+    lbl.position.set(0, 0, 0); lbl.center.set(0.5, 0.5);   // capsule sits ON the point
+    mesh.add(lbl);
+    nodeLabels.push({ lbl, mesh, node:n, el:cap, w:null, h:null, op:0, on:false });
+  });
+
+  // --- categories ---
+  data.cats.forEach(cat => {
+    const col = new THREE.Color(cat.color);
+    const mat = new THREE.MeshBasicMaterial({ color: col });   // flat & unlit
+    const mesh = new THREE.Mesh(catGeo, mat);
+    mesh.position.copy(cat.pos); mesh.scale.setScalar(5.5);
+    mesh.userData = { type:'cat', data:cat };
+    graphGroup.add(mesh); catMeshes.push(mesh);
+    if (theme.glow) addGlow(mesh, col, 22);
+
+    const cap = makeCap('', 'cat');
+    const dot = document.createElement('span'); dot.className='dot'; dot.style.background = cat.color;
+    const nm = document.createElement('span'); nm.textContent = cat.name;
+    const cnt = document.createElement('span'); cnt.className='cnt'; cnt.textContent = cat.nodes.length;
+    cap.append(dot, nm, cnt);
+    const lbl = new CSS2DObject(cap);
+    lbl.position.set(0, 0, 0); lbl.center.set(0.5, 0.5);   // capsule sits ON the point
+    mesh.add(lbl);
+    catLabels.push({ lbl, mesh, cat, el:cap, w:null, h:null, op:0, on:false });
+  });
+
+  let maxR = data.Rcat;
+  data.allNodes.forEach(n => { maxR = Math.max(maxR, n.pos.length()); });   // include loose clusters
+  boundingRadius = maxR + UNIT;
+  maxRlocG = Math.max(data.maxRloc, UNIT);
+  currentData = data;
+}
+
+/* ----------------------------------------------------------------------
+ * 6. Camera fit + zoom range ("one logic")
+ * -------------------------------------------------------------------- */
+function applyZoomRangeAndFit(margin, animate){
+  const vFov = camera.fov * Math.PI/180;
+  // account for portrait aspect (horizontal fov is the binding constraint)
+  const hFov = 2 * Math.atan(Math.tan(vFov/2) * Math.min(1, camera.aspect));
+  const fov = Math.min(vFov, hFov);
+  const fitDist = (boundingRadius / Math.sin(fov/2)) * margin;
+
+  // Zoom range is bounded by the non-overlap logic:
+  //  - max zoom-OUT = the full-fit framing (can't pull back past "whole graph in view")
+  //  - max zoom-IN  = the distance at which ONE cluster fills the view; by then the
+  //                   nearest cluster's capsules are all shown, so we stop here.
+  const oneCluster = (maxRlocG / Math.sin(fov/2)) * 1.25;
+  controls.maxDistance = fitDist;
+  controls.minDistance = Math.min(oneCluster, fitDist * 0.6);
+  controls.target.set(0,0,0);
+
+  const dir = new THREE.Vector3(0.35, 0.45, 1).normalize();
+  const dest = dir.multiplyScalar(fitDist);
+  if (animate) startTween(dest, new THREE.Vector3(0,0,0));
+  else { camera.position.copy(dest); controls.update(); }
+  window._fitDist = fitDist;
+}
+// distance at which one cluster fills the view (≈ the "Detail" tier)
+function detailDistance(){ const v = camera.fov*Math.PI/180; return (maxRlocG / Math.sin(v/2)) * 1.25; }
+
+/* ----------------------------------------------------------------------
+ * 7. Camera tween (focus / re-fit)
+ * -------------------------------------------------------------------- */
+let tween = null;
+function startTween(destPos, destTarget){
+  tween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: destPos.clone(), t1: destTarget.clone(), k: 0 };
+}
+function stepTween(){
+  if (!tween) return;
+  tween.k = Math.min(1, tween.k + 0.018);                          // slower fly (~0.9s)
+  const k = tween.k;
+  const e = k < 0.5 ? 4*k*k*k : 1 - Math.pow(-2*k + 2, 3) / 2;     // ease-in-out cubic (gentle start & stop)
+  camera.position.lerpVectors(tween.p0, tween.p1, e);
+  controls.target.lerpVectors(tween.t0, tween.t1, e);
+  if (tween.k >= 1) tween = null;
+}
+function focusCategory(cat){
+  // Goal: every node capsule in this cluster is READABLE (non-overlapping),
+  // even if the cluster spills off-screen and you have to pan to see it all.
+  const vFov = camera.fov * Math.PI/180;
+  const focalPx = (innerHeight/2) / Math.tan(vFov/2);    // px per world-unit at distance 1
+
+  // estimate total capsule footprint (px²) without needing layout
+  let area = 0;
+  for (const n of cat.nodes){
+    const w = n.name.length * 6.3 + 22;                  // ~capsule width
+    area += (w + PAD*2) * (22 + PAD*2);
+  }
+  // cluster's spatial radius
+  let rloc = 1;
+  for (const n of cat.nodes) rloc = Math.max(rloc, n.pos.distanceTo(cat.pos));
+
+  const PACK = 2.2;                                       // generous spacing (better spread than crammed)
+  // projected disk radius = rloc*focalPx/dist ; its area must hold `area`*PACK
+  const spreadDist = rloc * focalPx * Math.sqrt(Math.PI / (PACK * area));
+  const fillDist   = rloc / Math.sin(vFov/2);             // cluster just fills the screen
+  let dist = Math.min(spreadDist, fillDist);              // spread if needed, else just fill
+  dist = Math.max(dist, rloc * 0.5);                      // never dive inside the cluster
+
+  // let the camera actually reach this distance and pan around the cluster
+  controls.minDistance = Math.min(controls.minDistance, dist * 0.9);
+
+  const dir = cat.pos.clone().normalize();
+  const dest = cat.pos.clone().add(dir.multiplyScalar(dist));
+  dest.y += rloc * 0.15;                                  // slight top-down angle
+  startTween(dest, cat.pos.clone());
+
+  autoRotate = false; document.getElementById('rot').classList.remove('on');  // stop spin while reading
+  resetHint('Drag to pan the cluster · pinch to zoom · tap a node · tap empty space to go back');
+}
+
+// Step back up to the whole-graph overview (also the Re-fit action).
+function unfocusToOverview(){
+  closeSheet();
+  applyZoomRangeAndFit(curFit, true);            // tween out + restore normal zoom range
+  autoRotate = true; document.getElementById('rot').classList.add('on');
+  resetHint();
+}
+
+// Bring a point to the screen. frac=0 → centre (default); frac=1/3 → upper third
+// (leaves the lower half free for the bottom sheet). dist optional (keeps current zoom).
+function locate(pos, dist, frac){
+  const off = camera.position.clone().sub(controls.target);
+  const d = dist != null ? dist : off.length();
+  off.normalize();
+  controls.minDistance = Math.min(controls.minDistance, d * 0.9);
+  const tgt = pos.clone();
+  if (frac){   // shift the orbit target down in screen space so the node rides higher
+    const up = camera.up.clone().addScaledVector(off, -camera.up.dot(off)).normalize();
+    tgt.addScaledVector(up, -d * Math.tan(camera.fov*Math.PI/360) * frac);
+  }
+  startTween(tgt.clone().addScaledVector(off, d), tgt);
+  autoRotate = false; document.getElementById('rot').classList.remove('on');
+}
+
+// Is the node already comfortably visible (on-screen, in the upper ~half the sheet won't cover)?
+function nodeInComfortZone(p){
+  tmp.copy(p).project(camera);
+  if (tmp.z > 1) return false;
+  const x = (tmp.x*0.5+0.5)*innerWidth, y = (-tmp.y*0.5+0.5)*innerHeight;
+  return x > innerWidth*0.06 && x < innerWidth*0.94 && y > innerHeight*0.10 && y < innerHeight*0.52;
+}
+
+/* ----------------------------------------------------------------------
+ * 8. Render loop + label LOD
+ * -------------------------------------------------------------------- */
+let cullEnabled = true, selectedNode = null;
+const tmp = new THREE.Vector3();
+
+/* ---- opening ("boot") animations — 4 variants, switchable for comparison ----
+   assemble 汇聚 · ripple 涟漪 · settle 沉降 · pullback 拉远 */
+const labelsEl = document.getElementById('labels');
+let intro = null, introVariant = 'assemble', asmList = null, lineMats = [];
+const _easeIO = k => k < 0.5 ? 4*k*k*k : 1 - Math.pow(-2*k + 2, 3) / 2;
+const _easeO  = k => 1 - Math.pow(1 - k, 3);
+const _easeBack = k => { const c = 1.6; return 1 + (c+1)*Math.pow(k-1,3) + c*Math.pow(k-1,2); };   // slight overshoot
+const _c01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+// per-variant config: camera distance [start,end]×fit, extra Y-rotation (settles to 0), edge fade window, dur
+const INTRO = {
+  assemble: { dist:[2.3,1.0], rot:0.0, line:[0.78,0.22], dur:3400, move:'scatter', pos:_easeO },
+  ripple:   { dist:[1.28,1.0], rot:0.0, line:[0.30,0.55], dur:3000, move:'none',    pos:_easeO },
+  settle:   { dist:[1.08,1.0], rot:0.25, line:[0.55,0.30], dur:3200, move:'jitter', pos:_easeBack },
+  pullback: { dist:[0.52,1.0], rot:1.35, line:[0.40,0.30], dur:3000, move:'none',    pos:_easeO },
+};
+function startIntro(){
+  if (intro) endIntro();
+  closeSheet(); tween = null;
+  const cfg = INTRO[introVariant];
+  // node/cat meshes: capture their own materials (dot + glow), build fly-in source positions
+  const all = [...nodeMeshes, ...catMeshes];
+  asmList = all.map((m, i) => {
+    const h = (i*0.6180339887) % 1, h2 = (i*0.7548776662) % 1, h3 = (i*0.3819660113) % 1;
+    const p1 = m.position.clone();
+    let dir = p1.clone(); if (dir.lengthSq() < 1e-6) dir.set(Math.cos(h*6.283), h2-0.5, Math.sin(h*6.283));
+    dir.normalize();
+    let p0 = p1.clone();
+    if (cfg.move === 'scatter') p0 = dir.multiplyScalar(boundingRadius*(1.55 + 1.1*h));
+    else if (cfg.move === 'jitter') p0 = p1.clone().add(new THREE.Vector3(h-0.5, h3-0.5, h2-0.5).multiplyScalar(boundingRadius*0.5));
+    // stagger: ripple = radial wave (centre→out); others = index stagger
+    const st = introVariant === 'ripple' ? _c01(p1.length()/(boundingRadius*0.92))*0.78 : 0.42*h2;
+    const mats = [{ mat:m.material, op:m.material.opacity != null ? m.material.opacity : 1, tr:m.material.transparent }];
+    m.children.forEach(c => { if (c.material) mats.push({ mat:c.material, op:c.material.opacity != null ? c.material.opacity : 1, tr:c.material.transparent }); });
+    mats.forEach(x => { x.mat.transparent = true; x.mat.opacity = 0; });
+    return { m, p0, p1, st, mats };
+  });
+  // line materials (hierarchy + relationship edges) fade as a group
+  lineMats = [];
+  graphGroup.traverse(o => { if (o.isLineSegments && o.material){
+    lineMats.push({ mat:o.material, op:o.material.opacity != null ? o.material.opacity : 1, tr:o.material.transparent });
+    o.material.transparent = true; o.material.opacity = 0; } });
+  labelsEl.style.opacity = '0'; controls.enabled = false; hideHint();
+  const fit = window._fitDist || boundingRadius*2.5;
+  intro = { t0: performance.now(), dur: cfg.dur, cfg, fit, min0:controls.minDistance, max0:controls.maxDistance,
+    dir: new THREE.Vector3(0.35, 0.45, 1).normalize() };
+  controls.minDistance = 1; controls.maxDistance = fit*3;
+}
+function endIntro(){
+  if (asmList) for (const s of asmList){ s.m.position.copy(s.p1); for (const x of s.mats){ x.mat.opacity = x.op; x.mat.transparent = x.tr; } }
+  for (const x of lineMats){ x.mat.opacity = x.op; x.mat.transparent = x.tr; }
+  asmList = null; lineMats = [];
+  controls.minDistance = intro.min0; controls.maxDistance = intro.max0;
+  labelsEl.style.opacity = '1'; controls.enabled = true; intro = null; resetHint();
+}
+function stepIntro(){
+  const cfg = intro.cfg;
+  const k = _c01((performance.now() - intro.t0) / intro.dur), e = _easeIO(k);
+  controls.target.set(0,0,0);
+  const dist = intro.fit * (cfg.dist[0] + (cfg.dist[1]-cfg.dist[0])*e);
+  const dir = intro.dir.clone().applyAxisAngle(new THREE.Vector3(0,1,0), cfg.rot*(1-e));   // rotation settles to 0
+  camera.position.copy(dir.multiplyScalar(dist));
+  for (const s of asmList){
+    const kk = _c01((e - s.st)/(1 - s.st));
+    s.m.position.lerpVectors(s.p0, s.p1, cfg.pos(kk));
+    const a = _c01(kk*1.7);                                  // node fades in as it arrives / as the wave reaches it
+    for (const x of s.mats) x.mat.opacity = x.op * a;
+  }
+  const la = _c01((e - cfg.line[0]) / cfg.line[1]);          // edges surface within their window
+  for (const x of lineMats) x.mat.opacity = x.op * la;
+  if (k >= 1) endIntro();
+}
+
+function loop(){
+  requestAnimationFrame(loop);
+  if (intro) stepIntro(); else stepTween();
+  controls.autoRotate = autoRotate && !pointerDown && !sheetOpen && !tween && !intro;
+  controls.update();
+
+  maybeCull();
+
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+  updateHud();
+}
+
+/* ----------------------------------------------------------------------
+ * 8b. Capsule visibility — depth + non-overlap, smoothed
+ *
+ *  Three things keep it from flickering:
+ *   1. DEPTH CULL  — only the FRONT hemisphere shows; clusters that rotate
+ *      to the back fade out. Gives a real 3D "near layer / far layer" read
+ *      and roughly halves the labels in play.
+ *   2. THROTTLE + HYSTERESIS — the keep/drop decision runs ~9x/sec (not every
+ *      frame), and a shown capsule is "sticky" (harder to drop than to add),
+ *      so labels don't trade places as the camera nudges.
+ *   3. FADE — opacity eases toward the decision every frame, so changes
+ *      cross-fade instead of blinking.
+ * -------------------------------------------------------------------- */
+const PAD = 5, HYST = 10;          // gap between capsules / stickiness margin (px)
+const DECIDE_MS = 110;             // how often the keep/drop set is recomputed
+const FADE = 0.08;                 // opacity easing per frame (gentle cross-fade between tiers)
+const scr = { x:0, y:0 };
+const wp = new THREE.Vector3();
+let cullDirty = true, visibleCaps = 0, lastDecideT = -1e9, curTier = 0;
+const lastCamPos = new THREE.Vector3(1e9,1e9,1e9);
+
+const grid = (function(cell){
+  const map = new Map();
+  const cells = (r,fn) => {
+    const x0=Math.floor(r.x/cell), x1=Math.floor((r.x+r.w)/cell);
+    const y0=Math.floor(r.y/cell), y1=Math.floor((r.y+r.h)/cell);
+    for (let cx=x0;cx<=x1;cx++) for (let cy=y0;cy<=y1;cy++) fn(cx*73856+cy);
+  };
+  return {
+    clear(){ map.clear(); },
+    insert(r){ cells(r, k => { let a=map.get(k); if(!a){a=[];map.set(k,a);} a.push(r); }); },
+    hits(r){ let bad=false; cells(r, k => { const a=map.get(k); if(a&&!bad) for(const o of a){ if(r.x<o.x+o.w&&r.x+r.w>o.x&&r.y<o.y+o.h&&r.y+r.h>o.y){bad=true;break;} } }); return bad; }
+  };
+})(80);
+
+function measure(it){
+  if (it.w != null) return true;
+  const w = it.el.offsetWidth, h = it.el.offsetHeight;
+  if (w > 0) { it.w = w; it.h = h; return true; }
+  return false;
+}
+function project(){                                   // projects `wp`, fills scr
+  tmp.copy(wp).project(camera);
+  if (tmp.z > 1) return false;                        // behind camera / far plane
+  scr.x = (tmp.x*0.5+0.5)*innerWidth;
+  scr.y = (-tmp.y*0.5+0.5)*innerHeight;
+  return scr.x>-80 && scr.x<innerWidth+80 && scr.y>-60 && scr.y<innerHeight+60;
+}
+
+// Decide which capsules should be on (throttled).
+function decide(){
+  grid.clear();
+  const vFov = camera.fov * Math.PI/180;
+  const centerDist = camera.position.distanceTo(controls.target);
+
+  // Zoom tier as a continuous factor:
+  //   t = 0  → Overview  (only categories; node text hidden, dots remain)
+  //   t = 1  → zoomed into a cluster (all of its nodes legible)
+  // The middle (manual zoom) blends: the node depth-band widens with t, so
+  // nodes fade in gradually & mixed with categories — non-overlap still holds.
+  const overviewDist = window._fitDist || (boundingRadius*3);
+  const detailDist   = (maxRlocG / Math.sin(vFov/2)) * 1.25;
+  let t = (overviewDist - centerDist) / Math.max(1, overviewDist - detailDist);
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  curTier = t;
+
+  const nodeCut = centerDist + t * Math.max(boundingRadius*0.03, maxRlocG*1.3);
+  const catCut  = centerDist + boundingRadius*0.35;
+  const nodesAllowed = t > 0.05;                      // hard categories-only at the very top
+
+  const nodes = nodeLabels.slice();
+  for (const it of nodes){ it.mesh.getWorldPosition(wp); it._d2 = wp.distanceToSquared(camera.position); }
+  nodes.sort((a,b)=>a._d2-b._d2);
+  const order = [...catLabels, ...nodes];             // categories claim space first
+
+  let shown = 0, pending = false;
+  for (const it of order){
+    const isCat = it.cat != null;
+    const forced = it.node && it.node === selectedNode;
+    if (!isCat && !forced && !nodesAllowed) { it.on = false; continue; }           // Overview = no node text
+    it.mesh.getWorldPosition(wp);
+    const d = wp.distanceTo(camera.position);
+    if (!forced && d > (isCat ? catCut : nodeCut)) { it.on = false; continue; }     // back / out-of-tier
+    if (!measure(it)) { it.on = true; shown++; pending = true; continue; }          // re-decide once laid out
+    if (!project()) { it.on = false; continue; }
+    const pad = it.on ? PAD : PAD + HYST;             // sticky: shown ones are easier to keep
+    const r = { x: scr.x-it.w/2-pad, y: scr.y-it.h/2-pad, w: it.w+2*pad, h: it.h+2*pad };
+    if (forced || !grid.hits(r)) {
+      it.on = true; shown++;
+      grid.insert({ x: scr.x-it.w/2-PAD, y: scr.y-it.h/2-PAD, w: it.w+2*PAD, h: it.h+2*PAD });
+    } else it.on = false;
+  }
+  visibleCaps = shown;
+  if (pending) cullDirty = true;
+}
+
+// Ease every capsule's opacity toward its on/off target (every frame).
+function fadeLabel(it){
+  const target = it.on ? 1 : 0;
+  it.op += (target - it.op) * FADE;
+  if (it.on || it.op > 0.02){
+    if (!it.lbl.visible) it.lbl.visible = true;
+    it.el.style.opacity = it.op.toFixed(3);
+  } else if (it.lbl.visible){
+    it.lbl.visible = false;
+  }
+}
+
+function maybeCull(){
+  if (!cullEnabled){
+    for (const it of nodeLabels) it.on = true;
+    for (const it of catLabels) it.on = true;
+    visibleCaps = nodeLabels.length + catLabels.length;
+  } else {
+    const moved = camera.position.distanceToSquared(lastCamPos);
+    const now = performance.now();
+    if (cullDirty || (moved > 0.0001 && now - lastDecideT > DECIDE_MS)){
+      lastDecideT = now; lastCamPos.copy(camera.position); cullDirty = false;
+      decide();
+    }
+  }
+  for (const it of nodeLabels) fadeLabel(it);
+  for (const it of catLabels) fadeLabel(it);
+}
+
+/* ----------------------------------------------------------------------
+ * 9. Interaction: tap to select / focus
+ * -------------------------------------------------------------------- */
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let pointerDown = false, downX=0, downY=0, downT=0, moved=0;
+
+renderer.domElement.addEventListener('pointerdown', e => { pointerDown=true; downX=e.clientX; downY=e.clientY; downT=performance.now(); moved=0; });
+renderer.domElement.addEventListener('pointermove', e => { if(pointerDown) moved=Math.max(moved, Math.hypot(e.clientX-downX, e.clientY-downY)); });
+function hitCapsule(px, py){
+  let best = null, bestD = Infinity;
+  const scan = (arr, type) => {
+    for (const it of arr){
+      if (!it.lbl.visible || it.op < 0.45) continue;     // only clearly-shown capsules
+      const rc = it.el.getBoundingClientRect();
+      if (px>=rc.left && px<=rc.right && py>=rc.top && py<=rc.bottom){
+        const d = (px-(rc.left+rc.width/2))**2 + (py-(rc.top+rc.height/2))**2;
+        if (d < bestD){ bestD = d; best = { it, type }; }
+      }
+    }
+  };
+  scan(catLabels, 'cat'); scan(nodeLabels, 'node');   // nodes win ties (drawn on top)
+  return best;
+}
+// Tapping a category: at Overview (mostly just categories) → zoom in;
+// once you're zoomed in enough that nodes are showing → open its node list.
+const CAT_SHEET_TIER = 0.9;
+function categoryTap(cat){ if (curTier < CAT_SHEET_TIER) focusCategory(cat); else openCategorySheet(cat); }
+renderer.domElement.addEventListener('pointerup', e => {
+  pointerDown = false;
+  if (intro) return;                                     // no graph taps while the opening plays
+  if (moved > 9 || performance.now()-downT > 500) return; // was a drag, not a tap
+
+  // 1) a visible capsule wins
+  const cap = hitCapsule(e.clientX, e.clientY);
+  if (cap){
+    if (cap.type === 'cat') categoryTap(cap.it.cat); else openSheet(cap.it.node);
+    hideHint(); return;
+  }
+  // 2) a bare category dot → same tier-aware behaviour
+  ndc.x = (e.clientX/innerWidth)*2-1; ndc.y = -(e.clientY/innerHeight)*2+1;
+  ray.setFromCamera(ndc, camera);
+  const catHit = ray.intersectObjects(catMeshes, false);
+  if (catHit.length){ categoryTap(catHit[0].object.userData.data); hideHint(); return; }
+  // 3) empty space → dismiss an open sheet, else step back up to Overview (if zoomed in)
+  if (sheetOpen) { closeSheet(); return; }
+  const overviewDist = window._fitDist || (boundingRadius*3);
+  if (camera.position.distanceTo(controls.target) < overviewDist*0.92) unfocusToOverview();
+});
+
+/* ----------------------------------------------------------------------
+ * 10. Detail sheet
+ * -------------------------------------------------------------------- */
+const sheet = document.getElementById('sheet');
+let sheetOpen = false;
+function relatedNodes(n){
+  const out = [], seen = new Set();
+  RAW.edges.forEach(e => {
+    const o = e.a === n ? e.b : (e.b === n ? e.a : null);
+    if (o && !seen.has(o.id)) { seen.add(o.id); out.push(o); }
+  });
+  return out;
+}
+function elm(tag, cls){ const e = document.createElement(tag); if (cls) e.className = cls; return e; }
+function pillEl(txt, swatch){
+  const s = elm('span','mpill');
+  if (swatch){ const d = elm('span','swatch'); d.style.background = swatch; s.append(d); }
+  s.append(document.createTextNode(txt));
+  return s;
+}
+function secttlEl(txt){ const d = elm('div','secttl'); d.textContent = txt; return d; }
+
+// node detail — Related first (compact, tappable → jump straight to that node, no back button),
+// then the variable-length Summary.
+function openSheet(n){
+  selectedNode = n; cullDirty = true;
+  nodeLabels.forEach(it => it.el.classList.toggle('selected', it.node === n));
+  document.getElementById('sTitle').textContent = n.name;
+  const body = document.getElementById('sheetBody'); body.innerHTML = '';
+
+  const rel = relatedNodes(n);
+  body.append(secttlEl(`Related (${rel.length})`));
+  const r = elm('div','rel');
+  rel.slice(0, 30).forEach(o => {
+    const p = elm('span','pill rpill'); p.textContent = o.name;
+    p.addEventListener('click', () => openSheet(o));   // jump to that node
+    r.append(p);
+  });
+  body.append(r);
+
+  body.append(secttlEl('Summary'));
+  const sum = elm('div','summary'); sum.textContent = n.summary || '—'; body.append(sum);
+
+  sheet.classList.add('open'); sheetOpen = true;
+  // if the sheet would cover the node (or it's off-screen / behind), float it up to the upper third
+  if (!nodeInComfortZone(n.pos)) locate(n.pos, undefined, 1/3);
+}
+
+// category detail — list of the category's nodes (+ a zoom-in action)
+function openCategorySheet(cat){
+  selectedNode = null; cullDirty = true;
+  nodeLabels.forEach(it => it.el.classList.remove('selected'));
+  document.getElementById('sTitle').textContent = cat.name;
+  const body = document.getElementById('sheetBody'); body.innerHTML = '';
+
+  const hd = elm('div','listhdr');
+  const hl = elm('span'); hl.textContent = `Nodes (${cat.nodes.length})`;
+  const hr = elm('span','hr'); hr.textContent = 'Connections';
+  hd.append(hl, hr); body.append(hd);
+  const list = elm('div','nodelist');
+  cat.nodes.slice().sort((a,b) => (b.degree||0) - (a.degree||0)).forEach(nd => {
+    const row = elm('div','noderow');
+    const dot = elm('span','rdot'); dot.style.background = nd.color;
+    const nm = elm('span','rname'); nm.textContent = nd.name;
+    const dg = elm('span','rdeg'); dg.textContent = nd.degree != null ? nd.degree : '';
+    row.append(dot, nm, dg);
+    row.addEventListener('click', () => openSheet(nd));
+    list.append(row);
+  });
+  body.append(list);
+
+  sheet.classList.add('open'); sheetOpen = true;
+}
+function closeSheet(){ sheet.classList.remove('open'); sheetOpen=false; selectedNode=null; cullDirty=true; nodeLabels.forEach(it=>it.el.classList.remove('selected')); }
+document.getElementById('sheetClose').addEventListener('click', closeSheet);
+
+/* ----------------------------------------------------------------------
+ * 11. UI wiring
+ * -------------------------------------------------------------------- */
+let curSpread = 1.0, curFit = 0.5, autoRotate = true;
+
+// the old preset row now holds a category legend, filled once data loads
+function buildLegend(){
+  const seg = document.getElementById('presets');
+  seg.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;background:transparent;padding:0;max-width:86vw';
+  seg.innerHTML = '';
+  RAW.cats.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'lchip';
+    chip.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${c.color}"></span>${c.name} ${c.nodes.length}`;
+    seg.append(chip);
+  });
+}
+
+const fitEl = document.getElementById('fit'), spreadEl = document.getElementById('spread');
+fitEl.addEventListener('input', () => { curFit = +fitEl.value; document.getElementById('fitVal').textContent = curFit.toFixed(2)+'×'; applyZoomRangeAndFit(curFit, true); });
+spreadEl.addEventListener('input', () => { curSpread = +spreadEl.value; document.getElementById('spreadVal').textContent = curSpread.toFixed(2)+'×'; });
+spreadEl.addEventListener('change', () => rebuild(true));
+
+document.getElementById('lod').addEventListener('click', e => { cullEnabled = !cullEnabled; cullDirty = true; e.target.classList.toggle('on', cullEnabled); });
+document.getElementById('rot').addEventListener('click', e => { autoRotate = !autoRotate; e.target.classList.toggle('on', autoRotate); });
+document.getElementById('refit').addEventListener('click', () => unfocusToOverview());
+document.getElementById('toggleBtn').addEventListener('click', () => {
+  const hidden = document.getElementById('panel').classList.toggle('hidden');
+  document.getElementById('datasetTabs').style.display = hidden ? 'none' : 'flex';   // hide tabs with the panel
+});
+
+document.querySelectorAll('#themeSeg button').forEach(b => b.addEventListener('click', () => {
+  if (b.classList.contains('on')) return;
+  themeKey = b.dataset.th; theme = THEMES[themeKey];
+  document.documentElement.className = 'theme-' + themeKey;
+  document.body.className = 'theme-' + themeKey;
+  document.getElementById('themeColor').setAttribute('content', themeKey === 'light' ? '#efeee9' : '#0e0f12');
+  document.querySelectorAll('#themeSeg button').forEach(x => x.classList.toggle('on', x === b));
+  if (lastRaw){ RAW = parseSource(lastRaw); buildLegend(); rebuild(false); }
+}));
+
+/* ---- search (top-left) → centre the chosen node ---- */
+const searchEl = document.getElementById('search');
+function openSearch(){ searchEl.classList.add('open'); const i = document.getElementById('searchInput'); i.value=''; renderSearch(''); setTimeout(()=>i.focus(), 60); }
+function closeSearch(){ searchEl.classList.remove('open'); }
+function renderSearch(q){
+  const res = document.getElementById('searchResults'); res.innerHTML = '';
+  if (!RAW) return;
+  q = q.trim().toLowerCase();
+  let list = q ? RAW.allNodes.filter(n => (n.name||'').toLowerCase().includes(q)) : RAW.allNodes;
+  list = list.slice().sort((a,b) => (b.degree||0) - (a.degree||0)).slice(0, 60);
+  if (!list.length){ const e = elm('div','sempty'); e.textContent = q ? 'No matches' : ''; res.append(e); return; }
+  list.forEach(n => {
+    const row = elm('div','sres');
+    const dot = elm('span','rdot'); dot.style.background = n.color;
+    const nm = elm('span','rname'); nm.textContent = n.name;
+    const ct = elm('span','rcat'); ct.textContent = n.catName || '';
+    row.append(dot, nm, ct);
+    row.addEventListener('click', () => {
+      closeSearch();
+      selectedNode = n; cullDirty = true;
+      nodeLabels.forEach(it => it.el.classList.toggle('selected', it.node === n));
+      locate(n.pos, detailDistance());      // centre + zoom so its capsule shows
+    });
+    res.append(row);
+  });
+}
+document.getElementById('searchBtn').addEventListener('click', openSearch);
+document.getElementById('searchCancel').addEventListener('click', closeSearch);
+document.getElementById('searchInput').addEventListener('input', e => renderSearch(e.target.value));
+
+const hud = document.getElementById('hud');
+function updateHud(){
+  if (!currentData) return;
+  const d = camera.position.distanceTo(controls.target);
+  const zoomPct = Math.round((window._fitDist / d) * 100);
+  const tier = curTier <= 0.05 ? 'Overview' : `Detail ${Math.round(curTier*100)}%`;
+  hud.innerHTML =
+    `group <b>${RAW.groupId || '—'}</b> · categories <b>${currentData.cats.length}</b> · nodes <b>${currentData.allNodes.length}</b> · edges <b>${currentData.relLinks.length}</b><br>` +
+    `tier <b>${tier}</b> · capsules <b>${visibleCaps}</b>/${currentData.allNodes.length + currentData.cats.length} · zoom <b>${zoomPct}%</b> · range <b>${Math.round(controls.minDistance)}–${Math.round(controls.maxDistance)}</b>`;
+}
+
+let hintTimer;
+const DEFAULT_HINT = '1 finger rotate · 2 fingers pan · pinch zoom · tap a node · tap a category for its list';
+function hideHint(){ const h=document.getElementById('hint'); h.style.opacity='0'; }
+function resetHint(msg){ const h=document.getElementById('hint'); h.textContent = msg || DEFAULT_HINT; h.style.opacity='1'; clearTimeout(hintTimer); hintTimer=setTimeout(hideHint, 6000); }
+
+function rebuild(animate){
+  if (intro) endIntro();   // mesh/material refs go stale across a rebuild
+  closeSheet();
+  const data = buildData(curSpread);
+  buildGraph(data);
+  applyZoomRangeAndFit(curFit, animate);
+  resetHint();
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+  cullDirty = true;
+});
+
+/* ----------------------------------------------------------------------
+ * 12. Boot — dataset tabs, load the selected source, build & run
+ * -------------------------------------------------------------------- */
+function buildDatasetTabs(){
+  const bar = document.getElementById('datasetTabs');
+  bar.innerHTML = '';
+  DATASETS.forEach(ds => {
+    const b = document.createElement('button');
+    b.textContent = ds.label;
+    if (ds.key === curDataset) b.classList.add('on');
+    b.addEventListener('click', () => { if (ds.key !== curDataset) loadDataset(ds.key); });
+    bar.append(b);
+  });
+}
+function loadDataset(key){
+  const ds = DATASETS.find(d => d.key === key) || DATASETS[0];
+  curDataset = ds.key;
+  buildDatasetTabs();
+  const ld = document.getElementById('loading');
+  ld.style.display = 'flex'; ld.textContent = 'loading ' + ds.label + '…';
+  return fetch(ds.url)
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(t => {
+      lastRaw = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1));   // tolerate stray prefix / md fences
+      RAW = parseSource(lastRaw);
+      buildLegend();
+      rebuild(false);
+      ld.style.display = 'none';
+      startIntro();
+    })
+    .catch(err => { ld.style.display = 'flex'; ld.textContent = 'Failed to load ' + ds.url + ' — ' + err.message; });
+}
+
+// boot-animation variant switcher + replay (preview only)
+document.querySelectorAll('#introBar button[data-v]').forEach(b => b.addEventListener('click', () => {
+  introVariant = b.dataset.v;
+  document.querySelectorAll('#introBar button[data-v]').forEach(x => x.classList.toggle('on', x === b));
+  startIntro();
+}));
+document.getElementById('replayBoot').addEventListener('click', () => startIntro());
+
+window._dbg = { camera, controls, openSheet, relatedNodes, nodeInComfortZone, startIntro, set variant(v){ introVariant = v; }, get variant(){ return introVariant; }, get RAW(){ return RAW; }, get tween(){ return !!tween; }, get intro(){ return !!intro; },
+  simIntro(frac){ if (intro){ intro.t0 = performance.now() - frac*intro.dur; stepIntro(); } return { active:!!intro, camDist:Math.round(camera.position.length()) }; },   // TEST: inject elapsed time
+  frame(n){ for (let i=0;i<(n||60);i++){ if (intro) stepIntro(); else stepTween(); controls.update(); renderer.render(scene,camera); labelRenderer.render(scene,camera); maybeCull(); } } };   // TEMP test hook
+loadDataset(curDataset).then(() => loop());
+</script>
+</body>
+</html>

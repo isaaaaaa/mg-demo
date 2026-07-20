@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" id="themeColor" content="#0e0f12" />
+<title>Vonder · Memory Graph — intro demos</title>
+<style>
+  :root {
+    --bg0: #06070d;
+    --bg1: #0c1020;
+    --ink: #14161c;
+    --sheet: #f4f2ee;
+    --accent: #7d8aa8;
+    --amber: #e08a37;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; width: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Helvetica Neue", sans-serif;
+    color: #e9eaf0;
+    overscroll-behavior: none;
+  }
+  #scene { position: fixed; inset: 0; touch-action: none; }
+  #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; transition: opacity .7s ease; }
+
+  /* ---- intro variant chooser (demo page only) ---- */
+  #introBar {
+    position: fixed; bottom: calc(env(safe-area-inset-bottom) + 54px); left: 50%; transform: translateX(-50%);
+    z-index: 35; display: flex; gap: 2px; padding: 3px;
+    background: rgba(12,16,32,.72); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px; backdrop-filter: blur(8px);
+  }
+  #introBar button {
+    border: 0; background: transparent; color: #aeb1c0; font-family: inherit;
+    font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 9px; cursor: pointer; white-space: nowrap;
+  }
+  #introBar button.on { background: var(--accent); color: #fff; }
+  body.theme-light #introBar { background: rgba(255,255,255,.78); border-color: rgba(40,38,32,.14); }
+  body.theme-light #introBar button { color: #8a857a; }
+  body.theme-light #introBar button.on { color: #fff; }
+
+  /* ---- constant-size text capsules ---- */
+  .cap {
+    pointer-events: none;
+    white-space: nowrap;
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+    font-weight: 500;
+    user-select: none;
+    line-height: 1;
+  }
+  .cap.node { font-size: 11px; padding: 4px 10px; letter-spacing: .1px; }
+  .cap.cat  { font-size: 13px; font-weight: 600; padding: 6px 13px 6px 11px; display: flex; align-items: center; gap: 7px; }
+  .cap.cat .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .cap.cat .cnt { font-weight: 500; font-size: 11px; opacity: .5; }
+  .cap.selected { outline-offset: 1px; }
+  body.theme-dark  .cap.selected { outline: 2px solid #fff; }
+  body.theme-light .cap.selected { outline: 2px solid #0f0f0f; }
+
+  /* calm dark */
+  html.theme-dark, body.theme-dark { background: #0e0f12; }
+  body.theme-dark .cap.node { color:#d7d4cc; background:rgba(28,30,35,.92); border:1px solid rgba(255,255,255,.08); }
+  body.theme-dark .cap.cat  { color:#f1eee6; background:rgba(20,22,27,.95); border:1px solid rgba(255,255,255,.14); box-shadow:0 4px 18px rgba(0,0,0,.45); }
+  /* calm light (#EFEEE9) */
+  html.theme-light, body.theme-light { background: #efeee9; }
+  body.theme-light .cap.node { color:#3a3c42; background:#fbfaf7; border:1px solid rgba(40,38,32,.14); box-shadow:0 1px 3px rgba(60,55,45,.10); }
+  body.theme-light .cap.cat  { color:#26282d; background:#ffffff; border:1px solid rgba(40,38,32,.16); box-shadow:0 4px 16px rgba(70,64,52,.16); }
+
+  /* ---- control panel ---- */
+  #panel {
+    position: fixed; top: 0; left: 0; right: 0;
+    padding: calc(env(safe-area-inset-top) + 96px) 12px 12px;
+    background: linear-gradient(180deg, rgba(6,7,13,.92), rgba(6,7,13,0));
+    z-index: 20; transition: transform .28s ease;
+  }
+  #datasetTabs {
+    position: fixed; top: calc(env(safe-area-inset-top) + 52px); left: 50%; transform: translateX(-50%);
+    z-index: 28; display: flex; gap: 2px; padding: 3px;
+    background: rgba(12,16,32,.72); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px; backdrop-filter: blur(8px);
+  }
+  #datasetTabs button {
+    border: 0; background: transparent; color: #aeb1c0; font-family: inherit;
+    font-size: 12px; font-weight: 600; padding: 7px 16px; border-radius: 9px; cursor: pointer;
+  }
+  #datasetTabs button.on { background: var(--accent); color: #fff; }
+  #panel.hidden { transform: translateY(-102%); }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .seg { display: flex; background: rgba(255,255,255,.06); border-radius: 11px; padding: 3px; gap: 2px; }
+  .seg button {
+    border: 0; background: transparent; color: #aeb1c0;
+    font-size: 12px; font-weight: 600; padding: 7px 10px; border-radius: 9px;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .sliders { margin-top: 9px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .sl { display: flex; flex-direction: column; gap: 3px; }
+  .sl label { font-size: 10.5px; letter-spacing: .4px; text-transform: uppercase; color: #8d90a0; display: flex; justify-content: space-between; }
+  .sl label b { color: #d8d9e2; font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--accent); height: 22px; }
+  .toggles { margin-top: 9px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    font-size: 11.5px; color: #c9cbd6; background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.08); border-radius: 9px; padding: 6px 10px; cursor: pointer; user-select: none;
+  }
+  .chip.on { background: rgba(176,107,255,.22); border-color: rgba(176,107,255,.6); color: #fff; }
+
+  #hud {
+    margin-top: 9px; font-size: 11px; color: #8e91a2; line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+  }
+  #hud b { color: #cfd1dc; font-weight: 600; }
+
+  /* ---- top bar (Figma 1258:19050): search · MEMORY GRAPH · re-fit ---- */
+  #topbar {
+    position: fixed; top: env(safe-area-inset-top); left: 0; right: 0; z-index: 25;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 8px; color: #fff; pointer-events: none; touch-action: manipulation;
+  }
+  body.theme-light #topbar { color: #0f0f0f; }
+  #topbar .tbtn {
+    pointer-events: auto; width: 40px; height: 40px; border: 0; background: transparent;
+    color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  #titleTap {
+    pointer-events: auto; font-size: 13px; font-weight: 500; letter-spacing: -0.13px;
+    text-transform: uppercase; padding: 12px 22px; cursor: default; user-select: none; -webkit-user-select: none;
+  }
+
+  #hint {
+    position: fixed; bottom: calc(env(safe-area-inset-bottom) + 12px); left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: #9a9db0; background: rgba(8,10,18,.55); padding: 7px 13px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.07); z-index: 15; transition: opacity .5s; text-align: center; max-width: 92vw;
+  }
+
+  /* ---- detail bottom sheet ---- */
+  #sheet {
+    position: fixed; left: 50%; bottom: 0; transform: translate(-50%, 110%);
+    width: 100%; max-width: 460px; z-index: 30;
+    background: var(--sheet); color: var(--ink);
+    border-radius: 22px 22px 0 0;
+    padding: 22px 22px calc(env(safe-area-inset-bottom) + 26px);
+    box-shadow: 0 -18px 50px rgba(0,0,0,.5);
+    transition: transform .34s cubic-bezier(.22,1,.36,1);
+    height: 42vh; overflow-y: auto;   /* consistent size, between 1/3 and 1/2 of the screen */
+  }
+  #sheet.open { transform: translate(-50%, 0); }
+  #sheet .close {
+    position: absolute; top: 16px; right: 16px; width: 30px; height: 30px; border: 0; background: transparent;
+    font-size: 22px; color: #555; cursor: pointer; line-height: 1;
+  }
+  #sheet h1 {
+    font-family: Georgia, "Times New Roman", serif; font-weight: 600;
+    font-size: 23px; letter-spacing: .5px; text-transform: uppercase; margin: 2px 76px 22px 0; color: #1a1c22;
+    overflow-wrap: anywhere;   /* long names wrap instead of running under the locate/close buttons */
+  }
+  #sheet .locate {
+    position: absolute; top: 15px; right: 52px; width: 30px; height: 30px; border: 0; background: transparent;
+    color: #6a6c72; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  #sheet .locate:active { color: var(--accent); }
+  #sheet .secttl { font-size: 11px; letter-spacing: .8px; text-transform: uppercase; color: #6f717a; margin: 0 0 12px; }
+  #sheet .summary { font-size: 13.5px; color: #2a2c33; line-height: 1.55; white-space: pre-wrap; margin-bottom: 22px; }
+  #sheet .rel { margin-top: 2px; display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 22px; }
+  #sheet .rel .pill { font-size: 11.5px; background: #e7e4dd; color: #4a4c52; padding: 4px 10px; border-radius: 999px; max-width: 100%; overflow-wrap: anywhere; }
+  #sheet .rel .rpill { cursor: pointer; }
+  #sheet .rel .rpill:active { background: #d8d4cb; }
+  #sheet .zoombtn {
+    width: 100%; margin: 0 0 22px; padding: 11px; border: 0; border-radius: 12px; cursor: pointer;
+    background: var(--ink); color: #fff; font-family: inherit; font-size: 13px; font-weight: 600;
+  }
+  #sheet .nodelist { display: flex; flex-direction: column; }
+  #sheet .noderow {
+    display: flex; align-items: center; gap: 10px; padding: 11px 4px; cursor: pointer;
+    border-top: 1px solid rgba(0,0,0,.07);
+  }
+  #sheet .noderow:active { background: rgba(0,0,0,.04); }
+  #sheet .noderow .rdot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  #sheet .noderow .rname { flex: 1; font-size: 14px; color: #24262d; line-height: 1.35; overflow-wrap: anywhere; }   /* wrap long names in full */
+  #sheet .noderow .rdeg { font-size: 11.5px; color: #9a9ca3; font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; }
+  #sheet .listhdr { display:flex; justify-content:space-between; align-items:baseline; font-size:11px; letter-spacing:.8px; text-transform:uppercase; color:#6f717a; margin:0 0 6px; }
+  #sheet .listhdr .hr { color:#9a9ca3; }
+
+  /* category legend chips */
+  .lchip { font-size: 11px; border-radius: 8px; padding: 4px 8px; display: flex; align-items: center; gap: 5px; }
+  body.theme-dark  .lchip { color:#c9cbd6; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); }
+  body.theme-light .lchip { color:#5a564e; background:rgba(40,38,32,.06); border:1px solid rgba(40,38,32,.12); }
+
+  /* light theme — keep the chrome light too so the whole background reads light */
+  body.theme-light #panel { background: linear-gradient(180deg, rgba(239,238,233,.96), rgba(239,238,233,0)); }
+  body.theme-light #datasetTabs { background: rgba(255,255,255,.78); border-color: rgba(40,38,32,.14); color:#4a4640; }
+  body.theme-light #datasetTabs button { color:#8a857a; }
+  body.theme-light #datasetTabs button.on { color:#fff; }
+  body.theme-light #hint { background: rgba(255,255,255,.72); color:#7a756a; border-color: rgba(40,38,32,.12); }
+  body.theme-light .chip { background: rgba(40,38,32,.06); border-color: rgba(40,38,32,.12); color:#5a564e; }
+  body.theme-light .chip.on { background: rgba(125,138,168,.25); border-color: rgba(125,138,168,.6); color:#33373f; }
+  body.theme-light .seg { background: rgba(40,38,32,.06); }
+  body.theme-light .seg button { color:#8a857a; }
+  body.theme-light #hud, body.theme-light #hud b { color:#6f6a5f; }
+  body.theme-light .sl label { color:#8a857a; }
+  body.theme-light .sl label b { color:#4a4640; }
+
+  /* search */
+  #search { position: fixed; inset: 0; z-index: 50; display: none; flex-direction: column; padding: calc(env(safe-area-inset-top) + 12px) 14px 0; }
+  #search.open { display: flex; }
+  body.theme-dark  #search { background: rgba(10,11,14,.97); }
+  body.theme-light #search { background: rgba(244,243,239,.98); }
+  #search .srow { display: flex; gap: 8px; align-items: center; }
+  #search input {
+    flex: 1; font-size: 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid; font-family: inherit; outline: none;
+  }
+  body.theme-dark  #search input { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); color: #e9eaf0; }
+  body.theme-light #search input { background: #fff; border-color: rgba(40,38,32,.16); color: #26282d; }
+  #search .scancel { border: 0; background: transparent; font-family: inherit; font-size: 14px; cursor: pointer; padding: 8px 6px; }
+  body.theme-dark  #search .scancel { color: #9aa0b5; }
+  body.theme-light #search .scancel { color: #8a857a; }
+  #searchResults { margin-top: 6px; overflow-y: auto; flex: 1; }
+  #search .sres { display: flex; align-items: center; gap: 10px; padding: 12px 4px; cursor: pointer; border-bottom: 1px solid; }
+  body.theme-dark  #search .sres { border-color: rgba(255,255,255,.06); }
+  body.theme-light #search .sres { border-color: rgba(40,38,32,.08); }
+  #search .sres .rdot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  #search .sres .rname { flex: 1; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.theme-dark  #search .sres .rname { color: #e3e1da; }
+  body.theme-light #search .sres .rname { color: #2a2c33; }
+  #search .sres .rcat { font-size: 11.5px; opacity: .65; white-space: nowrap; }
+  body.theme-dark  #search .sres .rcat { color: #9aa0b5; }
+  body.theme-light #search .sres .rcat { color: #8a857a; }
+  #search .sempty { padding: 18px 4px; font-size: 13px; opacity: .5; }
+
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #6a6d80; font-size: 13px; z-index: 40; pointer-events: none; }
+</style>
+</head>
+<body class="theme-dark">
+  <canvas id="scene"></canvas>
+  <div id="labels"></div>
+
+  <div id="topbar">
+    <button class="tbtn" id="searchBtn" aria-label="Search">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+    <div id="titleTap">Memory Graph</div>
+    <button class="tbtn" id="refitBtn" aria-label="Re-fit view">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    </button>
+  </div>
+  <div id="datasetTabs" style="display:none"></div>
+
+  <div id="search">
+    <div class="srow">
+      <input id="searchInput" type="text" placeholder="Search nodes…" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <button class="scancel" id="searchCancel">Cancel</button>
+    </div>
+    <div id="searchResults"></div>
+  </div>
+
+  <div id="panel" class="hidden">
+    <div class="row">
+      <div class="seg" id="presets"></div>
+    </div>
+    <div class="sliders">
+      <div class="sl">
+        <label>Initial zoom (fit) <b id="fitVal">1.00×</b></label>
+        <input type="range" id="fit" min="0.4" max="2.6" step="0.05" value="1.0" />
+      </div>
+      <div class="sl">
+        <label>Spread (spacing) <b id="spreadVal">1.0×</b></label>
+        <input type="range" id="spread" min="0.6" max="2.0" step="0.05" value="1.0" />
+      </div>
+    </div>
+    <div class="toggles">
+      <div class="chip on" id="lod">Prevent overlap</div>
+      <div class="chip on" id="rot">Auto-rotate</div>
+      <div class="chip" id="refit">Re-fit view</div>
+      <div class="seg" id="themeSeg" style="margin-left:auto">
+        <button data-th="dark" class="on">Dark</button>
+        <button data-th="light">Light</button>
+      </div>
+    </div>
+    <div id="hud"></div>
+  </div>
+
+  <div id="hint">1 finger rotate · pinch zoom · tap a node for details · tap a category to focus · double-tap the title for settings</div>
+
+  <div id="introBar">
+    <button data-i="approach" class="on">A 接近</button>
+    <button data-i="assemble">B 汇聚</button>
+    <button data-i="sweep">C 扫掠</button>
+    <button data-i="emerge">D 抽离</button>
+    <button data-i="combo">E 合体</button>
+  </div>
+
+  <div id="sheet">
+    <button class="close" id="sheetClose">×</button>
+    <button class="locate" id="sheetLocate" aria-label="Locate on graph">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8"/><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/></svg>
+    </button>
+    <h1 id="sTitle"></h1>
+    <div id="sheetBody"></div>
+  </div>
+
+  <div id="loading">loading data…</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://esm.sh/three@0.160.0",
+    "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* ----------------------------------------------------------------------
+ * 1. Config — category derivation & colours
+ * -------------------------------------------------------------------- */
+const UNIT = 60;
+const DATASETS = [
+  { key:'light',  label:'Light',  url:'mockdata_light.md' },
+  { key:'medium', label:'Medium', url:'mockdata_medium.md' },
+  { key:'heavy',  label:'Heavy',  url:'mockdata_heavy.md' },
+];
+let curDataset = 'medium';
+
+// entity_type → category. Person/Organization/Place use the type name directly;
+// Topic uses its attributes.category; everything else (generic entities) → "Others".
+const TYPE_CAT = { Person:'Person', Organization:'Organization', Place:'Place' };
+function deriveCategoryKey(n){
+  const t = n.entity_type;
+  if (TYPE_CAT[t]) return t;
+  if (t === 'Topic') return (n.attributes && n.attributes.category) || 'Others';
+  return 'Others';
+}
+const titleCase = s => s.charAt(0).toUpperCase() + s.slice(1);
+function displayName(key){ return (TYPE_CAT[key] || key === 'Others') ? key : titleCase(key); }
+
+// calm "intelligence" palettes — muted, low-chroma. dark + light(#EFEEE9).
+const THEMES = {
+  dark: {
+    bg: 0x0e0f12, fog: 0.0008,
+    line: 0x6f6480, lineOpacity: 0.12, hierOpacity: 0.10,
+    lineHi: 0x9d92ba, lineHiOpacity: 0.4,   // selected node's edges — a notch brighter, still calm
+    nodeEmissive: 0.85, catEmissive: 0.95,
+    glow: true, glowOpacity: 0.30, glowBlend: THREE.AdditiveBlending,
+    star: true, starColor: 0x3a3d48, starOpacity: 0.5,
+    globe: { fill:0x223047, fillOpacity:0.01, rim:0x5a78b0, rimAlpha:0.09, blend: THREE.AdditiveBlending },
+    cat:    { Person:'#8198bd', Organization:'#c08aa2', Place:'#82ac99', Others:'#9a9ca0' },
+    topics: ['#c0a875','#929ec8','#86b0a0','#c89a86','#a892b6','#8ab0c0','#c4b486','#9aa6c4'],
+  },
+  light: {
+    bg: 0xefeee9, fog: 0.00055,
+    line: 0x8a8170, lineOpacity: 0.16, hierOpacity: 0.16,
+    lineHi: 0x6e6452, lineHiOpacity: 0.5,
+    nodeEmissive: 0.0, catEmissive: 0.0,
+    glow: false, glowOpacity: 0.0, glowBlend: THREE.NormalBlending,
+    star: false, starColor: 0xcfcabd, starOpacity: 0.0,
+    globe: { fill:0xbdb6a8, fillOpacity:0.01, rim:0x7a7466, rimAlpha:0.11, blend: THREE.NormalBlending },
+    cat:    { Person:'#566d92', Organization:'#8f5f78', Place:'#4f7d68', Others:'#86837c' },
+    topics: ['#9c8246','#5f6e9e','#4f8270','#a06a52','#7a5f8c','#5f8290','#8a7a3e','#566486'],
+  },
+};
+let themeKey = 'dark', theme = THEMES.dark, lastRaw = null;
+
+// fibonacci point on the unit sphere (idx may be fractional; arg is clamped)
+function fibDir(idx, count){
+  const k = idx + 0.5;
+  const c = Math.max(-1, Math.min(1, 1 - 2 * k / count));
+  const phi = Math.acos(c);
+  const th  = Math.PI * (1 + Math.sqrt(5)) * k;
+  return new THREE.Vector3(Math.sin(phi)*Math.cos(th), Math.cos(phi), Math.sin(phi)*Math.sin(th));
+}
+// deterministic 0..1 from a string (stable per-node jitter)
+function hash01(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return ((h>>>0)%100000)/100000; }
+
+/* ----------------------------------------------------------------------
+ * 2. Parse the data source into categories + edges (run once on load)
+ * -------------------------------------------------------------------- */
+let RAW = null;   // { cats, edges:[{a,b}], allNodes, byId, groupId }
+
+function parseSource(raw){
+  const byId = new Map();
+  (raw.nodes || []).forEach(n => byId.set(n.id, n));
+
+  const groups = new Map();
+  (raw.nodes || []).forEach(n => {
+    const key = deriveCategoryKey(n);
+    n._catKey = key; n._jit = hash01(n.id);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(n);
+  });
+
+  // order: structural types first, then topic categories by size, Others last
+  const rank = k => k === 'Others' ? 99 : (TYPE_CAT[k] ? 0 : 1);
+  const keys = [...groups.keys()].sort((a,b) => rank(a)-rank(b) || groups.get(b).length-groups.get(a).length);
+  // place Person LAST → it lands on the −Y (bottom) fibonacci slot, so people sit low in space
+  const pIdx = keys.indexOf('Person');
+  if (pIdx >= 0) { keys.splice(pIdx, 1); keys.push('Person'); }
+
+  let ti = 0;
+  const cats = keys.map(key => {
+    const color = theme.cat[key] || theme.topics[ti++ % theme.topics.length];
+    const cat = { id:'c_'+key, key, name: displayName(key), color, nodes: groups.get(key), pos: null };
+    cat.nodes.forEach(n => { n.color = color; n.catName = cat.name; });
+    return cat;
+  });
+
+  const edges = (raw.edges || [])
+    .filter(e => byId.has(e.source) && byId.has(e.target) && e.source !== e.target)
+    .map(e => ({ a: byId.get(e.source), b: byId.get(e.target) }));
+
+  return { cats, edges, allNodes: raw.nodes || [], byId, groupId: raw.group_id };
+}
+
+/* ----------------------------------------------------------------------
+ * 3. Layout — "knowledge planet": every node sits ON one sphere shell.
+ *    (Borrows the shell idea from the 3d-force-graph reference, but kept
+ *     analytic + category-grouped so zoom/category behaviour is unchanged.)
+ *    • shell radius R grows with node count (∝ √N) → ~constant star density
+ *    • each REAL category = a cap/continent centred on a Fibonacci point;
+ *      cap angle ∝ √count so density is uniform across continents
+ *    • "Others" is NOT a continent — it's scattered across the ocean
+ *      (the gaps between continents), with no anchor/label
+ * -------------------------------------------------------------------- */
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+function buildData(spread){
+  const cats = RAW.cats, N = RAW.allNodes.length;
+  const realCats = cats.filter(c => c.key !== 'Others');
+  const others   = cats.find(c => c.key === 'Others');
+  const numCaps  = Math.max(realCats.length, 1);
+  const R = UNIT * spread * (1.0 + 0.22 * Math.sqrt(Math.max(N, 1)));
+  const maxN = Math.max(1, ...realCats.map(c => c.nodes.length));
+  const MAXALPHA = 0.5;                                   // biggest continent's angular cap radius (rad)
+  let maxRloc = 1;
+  const caps = [];                                        // {c: unit centre, alpha} — for Others rejection
+
+  realCats.forEach((cat, i) => {
+    const c = fibDir(i, numCaps);                         // continent centre on the shell
+    cat.pos = c.clone().multiplyScalar(R);
+    const ref = Math.abs(c.y) < 0.99 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(1,0,0);
+    const u = new THREE.Vector3().crossVectors(c, ref).normalize();
+    const v = new THREE.Vector3().crossVectors(c, u).normalize();
+    const n = cat.nodes.length;
+    const alpha = MAXALPHA * Math.sqrt(n / maxN);         // cap ∝ √count → uniform surface density
+    caps.push({ c, alpha });
+    cat.nodes.forEach((node, j) => {
+      const beta = alpha * Math.sqrt((j + 0.5) / n) * (0.82 + 0.36 * node._jit);   // area-uniform + jitter
+      const phi  = GOLDEN_ANGLE * j + node._jit * 6.283;
+      const dir = c.clone().multiplyScalar(Math.cos(beta))
+        .addScaledVector(u, Math.sin(beta) * Math.cos(phi))
+        .addScaledVector(v, Math.sin(beta) * Math.sin(phi));
+      node.pos = dir.multiplyScalar(R);                   // on the shell (|pos| = R)
+      maxRloc = Math.max(maxRloc, node.pos.distanceTo(cat.pos));
+    });
+  });
+
+  // "Others" → scattered across the ocean (avoid continents, no anchor)
+  if (others && others.nodes.length){
+    others.pos = null;
+    const m = others.nodes.length;
+    const cand = Math.ceil(m * 3) + 16;
+    const ocean = [];
+    for (let s = 0; s < cand; s++){
+      const c = fibDir(s, cand);
+      let inside = false;
+      for (const cap of caps){ if (c.dot(cap.c) > Math.cos(cap.alpha * 1.15)){ inside = true; break; } }
+      if (!inside) ocean.push(c);
+    }
+    const step = ocean.length / m;
+    for (let k = 0; k < m; k++){
+      const c = ocean.length >= m ? ocean[Math.floor(k * step)] : fibDir(k, m);   // fallback if continents too dense
+      others.nodes[k].pos = c.clone().multiplyScalar(R);
+    }
+  }
+
+  const relLinks = RAW.edges.map(e => [e.a, e.b]);
+  return { cats, allNodes: RAW.allNodes, relLinks, Rcat: R, maxRloc };
+}
+
+/* ----------------------------------------------------------------------
+ * 4. Scene setup
+ * -------------------------------------------------------------------- */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+
+const labelRenderer = new CSS2DRenderer({ element: document.getElementById('labels') });
+labelRenderer.setSize(innerWidth, innerHeight);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(theme.bg);
+scene.fog = new THREE.Fog(theme.bg, 1, 1e6);   // linear backside-dim fog (updated per-frame)
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 1, 60000);
+camera.position.set(0, 0, 600);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.rotateSpeed = 0.42;
+controls.panSpeed = 0.8;
+controls.zoomSpeed = 0.9;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.2;
+controls.enablePan = false;   // #3: never pan — the globe centre stays at screen centre; navigation = rotate + zoom
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const dl = new THREE.DirectionalLight(0xffffff, 0.7); dl.position.set(1, 1, 1); scene.add(dl);
+const dl2 = new THREE.DirectionalLight(0x88aaff, 0.4); dl2.position.set(-1, -0.5, -1); scene.add(dl2);
+
+// themed starfield (rebuilt on theme change)
+let starPoints = null;
+function applyStars(){
+  if (starPoints){ scene.remove(starPoints); starPoints.geometry.dispose(); starPoints.material.dispose(); starPoints = null; }
+  if (!theme.star) return;
+  const g = new THREE.BufferGeometry(), N = 1200, a = new Float32Array(N*3);
+  for (let i=0;i<N;i++){ const r=6000+Math.random()*12000, t=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+    a[i*3]=r*Math.sin(ph)*Math.cos(t); a[i*3+1]=r*Math.cos(ph); a[i*3+2]=r*Math.sin(ph)*Math.sin(t); }
+  g.setAttribute('position', new THREE.BufferAttribute(a,3));
+  starPoints = new THREE.Points(g, new THREE.PointsMaterial({ color:theme.starColor, size:13, sizeAttenuation:true, transparent:true, opacity:theme.starOpacity }));
+  scene.add(starPoints);
+}
+
+// glow texture — loaded from ./halo.png so it can be hand-drawn / replaced.
+// (white art on transparent; it gets tinted with each node's colour.)
+const haloTex = new THREE.TextureLoader().load('halo.png');
+function addGlow(mesh, col, scale){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:haloTex, color:col, transparent:true, opacity:theme.glowOpacity, blending:theme.glowBlend, depthWrite:false }));
+  s.scale.setScalar(scale); mesh.add(s);
+}
+
+// Faint translucent globe so the sphere reads even when nodes are sparse:
+// a soft inner fill shell + a fresnel edge-rim (the silhouette glows).
+function buildGlobe(R){
+  const g = theme.globe; if (!g) return;
+  const fill = new THREE.Mesh(
+    new THREE.SphereGeometry(R * 0.98, 48, 32),
+    new THREE.MeshBasicMaterial({ color:g.fill, transparent:true, opacity:g.fillOpacity, side:THREE.BackSide, depthWrite:false })
+  );
+  fill.raycast = () => {};
+  graphGroup.add(fill);
+
+  const rim = new THREE.Mesh(
+    new THREE.SphereGeometry(R * 1.005, 48, 32),
+    new THREE.ShaderMaterial({
+      transparent:true, side:THREE.BackSide, blending:g.blend, depthWrite:false,
+      uniforms:{ rimColor:{ value:new THREE.Color(g.rim) }, rimAlpha:{ value:g.rimAlpha } },
+      vertexShader:'varying vec3 vN; varying vec3 vV; void main(){ vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); vV=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }',
+      fragmentShader:'uniform vec3 rimColor; uniform float rimAlpha; varying vec3 vN; varying vec3 vV; void main(){ float rim=pow(1.0-abs(dot(normalize(vN),normalize(vV))),3.0); gl_FragColor=vec4(rimColor, rim*rimAlpha); }'
+    })
+  );
+  rim.raycast = () => {};
+  graphGroup.add(rim);
+}
+
+const sphereGeo = new THREE.SphereGeometry(1, 14, 14);
+const catGeo = new THREE.SphereGeometry(1, 20, 20);
+
+/* ----------------------------------------------------------------------
+ * 5. Build / dispose graph objects
+ * -------------------------------------------------------------------- */
+let graphGroup = new THREE.Group();
+scene.add(graphGroup);
+let nodeMeshes = [], catMeshes = [], nodeLabels = [], catLabels = [], boundingRadius = 500, maxRlocG = 100, planetR = 200, currentData = null;
+let hiLine = null, arcPosArr = null, edgeSpans = [];   // per-edge arc vertex ranges, for selected-node edge highlight
+
+function disposeGraph(){
+  graphGroup.traverse(o => {
+    if (o instanceof CSS2DObject && o.element) o.element.remove();
+    if (o.geometry && o.geometry !== sphereGeo && o.geometry !== catGeo) o.geometry.dispose();
+    if (o.material) { (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose()); }
+  });
+  scene.remove(graphGroup);
+  graphGroup = new THREE.Group(); scene.add(graphGroup);
+  nodeMeshes = []; catMeshes = []; nodeLabels = []; catLabels = []; hiLine = null;
+  cullDirty = true;
+}
+
+function makeCap(text, cls){
+  const d = document.createElement('div');
+  d.className = 'cap ' + cls;
+  if (cls === 'cat') { d.innerHTML = ''; } // filled by caller
+  else d.textContent = text;
+  return d;
+}
+
+function buildGraph(data){
+  disposeGraph();
+  scene.background = new THREE.Color(theme.bg);
+  scene.fog = new THREE.Fog(theme.bg, 1, 1e6);   // linear; near/far updated per-frame to dim the back hemisphere
+  applyStars();
+  buildGlobe(data.Rcat);                          // faint translucent sphere (shows the form when sparse)
+
+  // --- hierarchy links (continent centre -> node; scattered Others have none) ---
+  const hier = [];
+  data.cats.forEach(cat => { if (!cat.pos) return; cat.nodes.forEach(n => { hier.push(cat.pos.x,cat.pos.y,cat.pos.z, n.pos.x,n.pos.y,n.pos.z); }); });
+  const hg = new THREE.BufferGeometry();
+  hg.setAttribute('position', new THREE.Float32BufferAttribute(hier,3));
+  graphGroup.add(new THREE.LineSegments(hg, new THREE.LineBasicMaterial({ color:theme.line, transparent:true, opacity:theme.hierOpacity })));
+
+  // --- relationship links: great-arcs that wrap OVER the shell (no chords through the interior) ---
+  const arc = [];
+  const na = new THREE.Vector3(), nb = new THREE.Vector3(), pp = new THREE.Vector3(), pc = new THREE.Vector3();
+  edgeSpans = [];
+  data.relLinks.forEach(([a,b]) => {
+    const s0 = arc.length;
+    na.copy(a.pos).normalize(); nb.copy(b.pos).normalize();
+    const dot = Math.max(-1, Math.min(1, na.dot(nb)));
+    const omega = Math.acos(dot), so = Math.sin(omega);
+    const rr = ((a.pos.length() + b.pos.length()) * 0.5) * 1.006;     // float just above the surface
+    if (so < 1e-3) { arc.push(a.pos.x,a.pos.y,a.pos.z, b.pos.x,b.pos.y,b.pos.z); }  // ~colinear/antipodal → straight
+    else {
+      const K = Math.min(24, Math.max(2, Math.ceil(omega / 0.18)));   // more segments for longer arcs
+      let prev = false;
+      for (let i = 0; i <= K; i++) {
+        const t = i / K, w0 = Math.sin((1 - t) * omega) / so, w1 = Math.sin(t * omega) / so;
+        pc.set(na.x*w0 + nb.x*w1, na.y*w0 + nb.y*w1, na.z*w0 + nb.z*w1).multiplyScalar(rr);
+        if (prev) arc.push(pp.x,pp.y,pp.z, pc.x,pc.y,pc.z);
+        pp.copy(pc); prev = true;
+      }
+    }
+    edgeSpans.push({ a, b, i0: s0, i1: arc.length });                 // remember this edge's slice of the buffer
+  });
+  arcPosArr = arc;
+  const cg = new THREE.BufferGeometry();
+  cg.setAttribute('position', new THREE.Float32BufferAttribute(arc,3));
+  graphGroup.add(new THREE.LineSegments(cg, new THREE.LineBasicMaterial({ color:theme.line, transparent:true, opacity:theme.lineOpacity })));
+
+  // Dot size scales WITH the shell radius: the fit distance is ∝ R, so the on-screen
+  // dot size stays identical across light/medium/heavy datasets (no fat dots when sparse).
+  const sizeK = data.Rcat / (UNIT * 4.5);
+  // --- nodes (grouped + loose) ---
+  data.allNodes.forEach(n => {
+    const col = new THREE.Color(n.color);
+    const mat = new THREE.MeshBasicMaterial({ color: col });   // flat & unlit — no light/shadow gradient on the dot
+    const mesh = new THREE.Mesh(sphereGeo, mat);
+    mesh.position.copy(n.pos); mesh.scale.setScalar(2.6 * sizeK);
+    mesh.userData = { type:'node', data:n };
+    graphGroup.add(mesh); nodeMeshes.push(mesh);
+    if (theme.glow) addGlow(mesh, col, 8 * sizeK);
+
+    const cap = makeCap(n.name, 'node');
+    const lbl = new CSS2DObject(cap);
+    lbl.position.set(0, 0, 0); lbl.center.set(0.5, 0.5);   // capsule sits ON the point
+    mesh.add(lbl);
+    nodeLabels.push({ lbl, mesh, node:n, el:cap, w:null, h:null, op:0, on:false });
+  });
+
+  // --- categories (continents only; "Others" is anchorless → skipped) ---
+  data.cats.forEach(cat => {
+    if (!cat.pos) return;
+    const col = new THREE.Color(cat.color);
+    const mat = new THREE.MeshBasicMaterial({ color: col });   // flat & unlit
+    const mesh = new THREE.Mesh(catGeo, mat);
+    mesh.position.copy(cat.pos); mesh.scale.setScalar(5.5 * sizeK);
+    mesh.userData = { type:'cat', data:cat };
+    graphGroup.add(mesh); catMeshes.push(mesh);
+    if (theme.glow) addGlow(mesh, col, 22 * sizeK);
+
+    const cap = makeCap('', 'cat');
+    const dot = document.createElement('span'); dot.className='dot'; dot.style.background = cat.color;
+    const nm = document.createElement('span'); nm.textContent = cat.name;
+    const cnt = document.createElement('span'); cnt.className='cnt'; cnt.textContent = cat.nodes.length;
+    cap.append(dot, nm, cnt);
+    const lbl = new CSS2DObject(cap);
+    lbl.position.set(0, 0, 0); lbl.center.set(0.5, 0.5);   // capsule sits ON the point
+    mesh.add(lbl);
+    catLabels.push({ lbl, mesh, cat, el:cap, w:null, h:null, op:0, on:false });
+  });
+
+  let maxR = data.Rcat;
+  data.allNodes.forEach(n => { maxR = Math.max(maxR, n.pos.length()); });
+  boundingRadius = maxR * 1.15;   // proportional padding → globe fills a CONSTANT screen fraction across datasets
+  planetR = data.Rcat;                                                    // shell radius (camera orbits outside this)
+  // clamp so one big continent can't push detailDist past the overview fit (would invert the tiers)
+  maxRlocG = Math.min(Math.max(data.maxRloc, UNIT), boundingRadius * 0.28);
+  currentData = data;
+}
+
+// Selected-node edge highlight: redraw its arcs as a slightly brighter overlay.
+function updateEdgeHighlight(){
+  if (hiLine){ graphGroup.remove(hiLine); hiLine.geometry.dispose(); hiLine.material.dispose(); hiLine = null; }
+  if (!selectedNode || !arcPosArr) return;
+  const pts = [];
+  for (const s of edgeSpans) if (s.a === selectedNode || s.b === selectedNode)
+    for (let i = s.i0; i < s.i1; i++) pts.push(arcPosArr[i]);
+  if (!pts.length) return;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  hiLine = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: theme.lineHi, transparent: true, opacity: theme.lineHiOpacity }));
+  hiLine.renderOrder = 1;
+  graphGroup.add(hiLine);
+}
+
+// One place for everything that follows a selection change: capsule ring,
+// forced visibility (via selectedNode in decide()), and the edge highlight.
+function setSelectedNode(n){
+  selectedNode = n; cullDirty = true;
+  nodeLabels.forEach(it => it.el.classList.toggle('selected', it.node === n));
+  updateEdgeHighlight();
+}
+
+/* ----------------------------------------------------------------------
+ * 6. Camera fit + zoom range ("one logic")
+ * -------------------------------------------------------------------- */
+function applyZoomRangeAndFit(margin, animate){
+  const vFov = camera.fov * Math.PI/180;
+  const hFov = 2 * Math.atan(Math.tan(vFov/2) * Math.min(1, camera.aspect));
+  const fov = Math.min(vFov, hFov);
+  const fitDist = (boundingRadius / Math.sin(fov/2)) * margin;
+
+  // #3 model: the globe centre is ALWAYS the orbit target (= screen centre).
+  // Navigation = rotate the globe + dolly. Camera stays OUTSIDE the shell.
+  controls.target.set(0,0,0);
+  controls.maxDistance = fitDist;            // zoom-out = whole planet in view
+  controls.minDistance = Math.max(fitDist / 3, planetR * 1.06);   // cap zoom-in at ~300%, never inside the shell
+  window._fitDist = fitDist;
+
+  if (animate){
+    startOrbit(camera.position.clone().normalize(), fitDist);     // dolly out, keep current orientation
+  } else {
+    const dir = new THREE.Vector3(0.3, 0.4, 1).normalize();
+    camera.position.copy(dir.multiplyScalar(fitDist));
+    controls.update();
+  }
+}
+// "Detail" tier distance for the planet model: camera ~1.5× the shell radius from centre.
+function detailDistance(){ return planetR * 1.5; }
+
+/* ----------------------------------------------------------------------
+ * 7. Camera moves — orbit the CENTRED globe. Interpolates in OrbitControls'
+ *    spherical space (theta via the shortest azimuth arc, phi clamped off
+ *    the poles, distance lerped). Unlike a great-circle slerp, the path can
+ *    never graze a pole, so the fixed +Y up-vector never rolls the screen.
+ * -------------------------------------------------------------------- */
+let tween = null;
+const PHI_MIN = 0.06, PHI_MAX = Math.PI - 0.06;
+function startOrbit(destDir, destDist){
+  const p = camera.position, r0 = p.length();
+  const th0 = Math.atan2(p.x, p.z);
+  const ph0 = Math.min(PHI_MAX, Math.max(PHI_MIN, Math.acos(Math.max(-1, Math.min(1, p.y / r0)))));
+  const ph1 = Math.min(PHI_MAX, Math.max(PHI_MIN, Math.acos(Math.max(-1, Math.min(1, destDir.y)))));
+  const dth = Math.atan2(destDir.x, destDir.z) - th0;
+  const th1 = th0 + ((dth % (2*Math.PI)) + 3*Math.PI) % (2*Math.PI) - Math.PI;   // shortest way around
+  tween = { th0, ph0, th1, ph1, r0,
+    r1: Math.min(controls.maxDistance, Math.max(controls.minDistance, destDist)), k: 0 };
+}
+function stepTween(){
+  if (!tween) return;
+  tween.k = Math.min(1, tween.k + 0.018);                          // ~0.9s
+  const k = tween.k, e = k < 0.5 ? 4*k*k*k : 1 - Math.pow(-2*k + 2, 3) / 2;   // ease-in-out
+  const th = tween.th0 + (tween.th1 - tween.th0) * e;
+  const ph = tween.ph0 + (tween.ph1 - tween.ph0) * e;
+  const r  = tween.r0  + (tween.r1  - tween.r0)  * e;
+  camera.position.set(Math.sin(ph)*Math.sin(th)*r, Math.cos(ph)*r, Math.sin(ph)*Math.cos(th)*r);
+  controls.target.set(0,0,0);
+  if (tween.k >= 1) tween = null;
+}
+
+// Tap a continent → rotate it to the front + dolly so it reads (globe centre stays centred).
+function focusCategory(cat){
+  const vFov = camera.fov * Math.PI/180;
+  let rloc = 1;
+  for (const n of cat.nodes) rloc = Math.max(rloc, n.pos.distanceTo(cat.pos));
+  const dist = planetR + rloc / Math.tan(vFov/2);     // front surface far enough to fit the continent
+  startOrbit(cat.pos.clone().normalize(), dist);
+  autoRotate = false; document.getElementById('rot').classList.remove('on');
+  resetHint('Drag to rotate the globe · pinch to zoom · tap a node · tap empty space to go back');
+}
+
+// Step back up to the whole-globe overview (also the Re-fit action).
+function unfocusToOverview(){
+  closeSheet();
+  applyZoomRangeAndFit(curFit, true);            // dolly out, keep orientation, centre = globe centre
+  autoRotate = true; document.getElementById('rot').classList.add('on');
+  resetHint();
+}
+
+// Rotate the globe so `pos` lands at the upper THIRD of the screen (not dead centre —
+// leaves the lower half free for the sheet/eye). dist optional (keeps current zoom otherwise).
+function locate(pos, dist){
+  const want = dist != null ? dist : camera.position.length();
+  const d = Math.min(controls.maxDistance, Math.max(controls.minDistance, want));
+  const rN = pos.length(), n = pos.clone().normalize();
+  // solve tilt angle a so the node projects at NDC y = +1/3 (screen y = H/3)
+  const K = Math.tan(camera.fov * Math.PI/360) / 3;
+  let a = 0;
+  for (let i = 0; i < 4; i++) a = Math.asin(Math.max(-1, Math.min(1, K * (d - rN*Math.cos(a)) / rN)));
+  // apply the tilt in OrbitControls' spherical space (screen-vertical == polar angle),
+  // clamped away from the poles where the up-vector would roll (Person sits near −Y).
+  const phi = Math.min(Math.PI - 0.06, Math.max(0.06, Math.acos(Math.max(-1, Math.min(1, n.y))) + a));
+  const th  = Math.atan2(n.x, n.z);
+  startOrbit(new THREE.Vector3(Math.sin(phi)*Math.sin(th), Math.cos(phi), Math.sin(phi)*Math.cos(th)), d);
+  autoRotate = false; document.getElementById('rot').classList.remove('on');
+}
+
+/* ----------------------------------------------------------------------
+ * 8. Render loop + label LOD
+ * -------------------------------------------------------------------- */
+let cullEnabled = true, selectedNode = null;
+const tmp = new THREE.Vector3();
+// Backside dimming: linear fog tied to camera distance fades the far half of the
+// shell into the background (front stays bright). near/far follow the camera each frame.
+function updateFog(){
+  if (!scene.fog || !scene.fog.isFog) return;
+  const d = camera.position.distanceTo(controls.target);
+  scene.fog.near = Math.max(d - boundingRadius * 0.5, 1);   // front hemisphere: no fog
+  scene.fog.far  = d + boundingRadius * 1.55;               // back hemisphere: fades to bg
+}
+function frame(){
+  if (intro) stepIntro(); else stepTween();
+  // Drag-rotate speed follows zoom: fast (~0.63) at 100% overview, slow (~0.21) at 300%,
+  // anchored so the feel at 150% matches the old constant 0.42.
+  const camD = camera.position.length(), fitD = window._fitDist || camD;
+  controls.rotateSpeed = Math.max(0.15, Math.min(0.7, 0.63 * camD / fitD));
+  controls.autoRotate = autoRotate && !pointerDown && !sheetOpen && !tween && !intro;
+  controls.update();
+
+  maybeCull();
+  updateFog();
+
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+  updateHud();
+}
+function loop(){ requestAnimationFrame(loop); frame(); }
+
+/* ----------------------------------------------------------------------
+ * 8b. Capsule visibility — depth + non-overlap, smoothed
+ *
+ *  Three things keep it from flickering:
+ *   1. DEPTH CULL  — only the FRONT hemisphere shows; clusters that rotate
+ *      to the back fade out. Gives a real 3D "near layer / far layer" read
+ *      and roughly halves the labels in play.
+ *   2. THROTTLE + HYSTERESIS — the keep/drop decision runs ~9x/sec (not every
+ *      frame), and a shown capsule is "sticky" (harder to drop than to add),
+ *      so labels don't trade places as the camera nudges.
+ *   3. FADE — opacity eases toward the decision every frame, so changes
+ *      cross-fade instead of blinking.
+ * -------------------------------------------------------------------- */
+const PAD = 5, HYST = 10;          // gap between capsules / stickiness margin (px)
+const DECIDE_MS = 110;             // how often the keep/drop set is recomputed
+const FADE = 0.08;                 // opacity easing per frame (gentle cross-fade between tiers)
+const scr = { x:0, y:0 };
+const wp = new THREE.Vector3();
+let cullDirty = true, visibleCaps = 0, lastDecideT = -1e9, curTier = 0;
+const lastCamPos = new THREE.Vector3(1e9,1e9,1e9);
+
+const grid = (function(cell){
+  const map = new Map();
+  const cells = (r,fn) => {
+    const x0=Math.floor(r.x/cell), x1=Math.floor((r.x+r.w)/cell);
+    const y0=Math.floor(r.y/cell), y1=Math.floor((r.y+r.h)/cell);
+    for (let cx=x0;cx<=x1;cx++) for (let cy=y0;cy<=y1;cy++) fn(cx*73856+cy);
+  };
+  return {
+    clear(){ map.clear(); },
+    insert(r){ cells(r, k => { let a=map.get(k); if(!a){a=[];map.set(k,a);} a.push(r); }); },
+    hits(r){ let bad=false; cells(r, k => { const a=map.get(k); if(a&&!bad) for(const o of a){ if(r.x<o.x+o.w&&r.x+r.w>o.x&&r.y<o.y+o.h&&r.y+r.h>o.y){bad=true;break;} } }); return bad; }
+  };
+})(80);
+
+function measure(it){
+  if (it.w != null) return true;
+  const w = it.el.offsetWidth, h = it.el.offsetHeight;
+  if (w > 0) { it.w = w; it.h = h; return true; }
+  return false;
+}
+function project(){                                   // projects `wp`, fills scr
+  tmp.copy(wp).project(camera);
+  if (tmp.z > 1) return false;                        // behind camera / far plane
+  scr.x = (tmp.x*0.5+0.5)*innerWidth;
+  scr.y = (-tmp.y*0.5+0.5)*innerHeight;
+  return scr.x>-80 && scr.x<innerWidth+80 && scr.y>-60 && scr.y<innerHeight+60;
+}
+
+// Decide which capsules should be on (throttled).
+function decide(){
+  grid.clear();
+  const vFov = camera.fov * Math.PI/180;
+  const centerDist = camera.position.distanceTo(controls.target);
+
+  // Zoom tier as a continuous factor:
+  //   t = 0  → Overview  (only categories; node text hidden, dots remain)
+  //   t = 1  → zoomed into a cluster (all of its nodes legible)
+  // The middle (manual zoom) blends: the node depth-band widens with t, so
+  // nodes fade in gradually & mixed with categories — non-overlap still holds.
+  const overviewDist = window._fitDist || (boundingRadius*3);
+  const detailDist   = planetR * 1.5;   // detail tier ≈ camera skimming the shell
+  let t = (overviewDist - centerDist) / Math.max(1, overviewDist - detailDist);
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  curTier = t;
+
+  const nodeCut = centerDist + t * Math.max(boundingRadius*0.03, maxRlocG*1.3);
+  const catCut  = centerDist + boundingRadius*0.35;
+  const nodesAllowed = t > 0.05;                      // hard categories-only at the very top
+
+  const nodes = nodeLabels.slice();
+  for (const it of nodes){ it.mesh.getWorldPosition(wp); it._d2 = wp.distanceToSquared(camera.position); }
+  nodes.sort((a,b)=>a._d2-b._d2);
+  const order = [...catLabels, ...nodes];             // categories claim space first
+
+  let shown = 0, pending = false;
+  for (const it of order){
+    const isCat = it.cat != null;
+    const forced = it.node && it.node === selectedNode;
+    if (!isCat && !forced && !nodesAllowed) { it.on = false; continue; }           // Overview = no node text
+    it.mesh.getWorldPosition(wp);
+    const d = wp.distanceTo(camera.position);
+    if (!forced && d > (isCat ? catCut : nodeCut)) { it.on = false; continue; }     // back / out-of-tier
+    if (!measure(it)) { it.on = true; shown++; pending = true; continue; }          // re-decide once laid out
+    if (!project()) { it.on = false; continue; }
+    const pad = it.on ? PAD : PAD + HYST;             // sticky: shown ones are easier to keep
+    const r = { x: scr.x-it.w/2-pad, y: scr.y-it.h/2-pad, w: it.w+2*pad, h: it.h+2*pad };
+    if (forced || !grid.hits(r)) {
+      it.on = true; shown++;
+      grid.insert({ x: scr.x-it.w/2-PAD, y: scr.y-it.h/2-PAD, w: it.w+2*PAD, h: it.h+2*PAD });
+    } else it.on = false;
+  }
+  visibleCaps = shown;
+  if (pending) cullDirty = true;
+}
+
+// Ease every capsule's opacity toward its on/off target (every frame).
+function fadeLabel(it){
+  const target = it.on ? 1 : 0;
+  it.op += (target - it.op) * FADE;
+  if (it.on || it.op > 0.02){
+    if (!it.lbl.visible) it.lbl.visible = true;
+    it.el.style.opacity = it.op.toFixed(3);
+  } else if (it.lbl.visible){
+    it.lbl.visible = false;
+  }
+}
+
+function maybeCull(){
+  if (!cullEnabled){
+    for (const it of nodeLabels) it.on = true;
+    for (const it of catLabels) it.on = true;
+    visibleCaps = nodeLabels.length + catLabels.length;
+  } else {
+    const moved = camera.position.distanceToSquared(lastCamPos);
+    const now = performance.now();
+    if (cullDirty || (moved > 0.0001 && now - lastDecideT > DECIDE_MS)){
+      lastDecideT = now; lastCamPos.copy(camera.position); cullDirty = false;
+      decide();
+    }
+  }
+  for (const it of nodeLabels) fadeLabel(it);
+  for (const it of catLabels) fadeLabel(it);
+}
+
+/* ----------------------------------------------------------------------
+ * 9. Interaction: tap to select / focus
+ * -------------------------------------------------------------------- */
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let pointerDown = false, downX=0, downY=0, downT=0, moved=0;
+
+renderer.domElement.addEventListener('pointerdown', e => { pointerDown=true; downX=e.clientX; downY=e.clientY; downT=performance.now(); moved=0; });
+renderer.domElement.addEventListener('pointermove', e => { if(pointerDown) moved=Math.max(moved, Math.hypot(e.clientX-downX, e.clientY-downY)); });
+function hitCapsule(px, py){
+  let best = null, bestD = Infinity;
+  const scan = (arr, type) => {
+    for (const it of arr){
+      if (!it.lbl.visible || it.op < 0.45) continue;     // only clearly-shown capsules
+      const rc = it.el.getBoundingClientRect();
+      if (px>=rc.left && px<=rc.right && py>=rc.top && py<=rc.bottom){
+        const d = (px-(rc.left+rc.width/2))**2 + (py-(rc.top+rc.height/2))**2;
+        if (d < bestD){ bestD = d; best = { it, type }; }
+      }
+    }
+  };
+  scan(catLabels, 'cat'); scan(nodeLabels, 'node');   // nodes win ties (drawn on top)
+  return best;
+}
+// Tapping a category: at Overview (mostly just categories) → zoom in;
+// once you're zoomed in enough that nodes are showing → open its node list.
+const CAT_SHEET_TIER = 0.9;
+function categoryTap(cat){ if (curTier < CAT_SHEET_TIER) focusCategory(cat); else openCategorySheet(cat); }
+renderer.domElement.addEventListener('pointerup', e => {
+  pointerDown = false;
+  if (moved > 9 || performance.now()-downT > 500) return; // was a drag, not a tap
+
+  // 1) a visible capsule wins
+  const cap = hitCapsule(e.clientX, e.clientY);
+  if (cap){
+    if (cap.type === 'cat') categoryTap(cap.it.cat); else openSheet(cap.it.node);
+    hideHint(); return;
+  }
+  // 2) a bare category dot → same tier-aware behaviour
+  ndc.x = (e.clientX/innerWidth)*2-1; ndc.y = -(e.clientY/innerHeight)*2+1;
+  ray.setFromCamera(ndc, camera);
+  const catHit = ray.intersectObjects(catMeshes, false);
+  if (catHit.length){ categoryTap(catHit[0].object.userData.data); hideHint(); return; }
+  // 3) empty space → dismiss an open sheet, else step back up to Overview (if zoomed in)
+  if (sheetOpen) { closeSheet(); return; }
+  const overviewDist = window._fitDist || (boundingRadius*3);
+  if (camera.position.distanceTo(controls.target) < overviewDist*0.92) unfocusToOverview();
+});
+
+/* ----------------------------------------------------------------------
+ * 10. Detail sheet
+ * -------------------------------------------------------------------- */
+const sheet = document.getElementById('sheet');
+let sheetOpen = false, sheetTarget = null, sheetNode = null;   // what the locate button targets (point + node, if any)
+function relatedNodes(n){
+  const out = [], seen = new Set();
+  RAW.edges.forEach(e => {
+    const o = e.a === n ? e.b : (e.b === n ? e.a : null);
+    if (o && !seen.has(o.id)) { seen.add(o.id); out.push(o); }
+  });
+  return out;
+}
+function elm(tag, cls){ const e = document.createElement(tag); if (cls) e.className = cls; return e; }
+function secttlEl(txt){ const d = elm('div','secttl'); d.textContent = txt; return d; }
+
+// node detail — Related first (compact, tappable → graph hopping stays above the fold),
+// then the variable-length Summary, which scrolls below.
+function openSheet(n){
+  setSelectedNode(n); sheetTarget = n.pos; sheetNode = n;
+  document.getElementById('sTitle').textContent = n.name;
+  const body = document.getElementById('sheetBody'); body.innerHTML = '';
+
+  const rel = relatedNodes(n);
+  body.append(secttlEl(`Related (${rel.length})`));
+  const r = elm('div','rel');
+  rel.slice(0, 30).forEach(o => {
+    const p = elm('span','pill rpill'); p.textContent = o.name;
+    p.addEventListener('click', () => openSheet(o));   // jump to that node (no back button by design)
+    r.append(p);
+  });
+  body.append(r);
+
+  body.append(secttlEl('Summary'));
+  const sum = elm('div','summary'); sum.textContent = n.summary || '—'; body.append(sum);
+
+  sheet.classList.add('open'); sheetOpen = true;
+}
+
+// category detail — list of the category's nodes (+ a zoom-in action)
+function openCategorySheet(cat){
+  setSelectedNode(null); sheetTarget = cat.pos; sheetNode = null;
+  document.getElementById('sTitle').textContent = cat.name;
+  const body = document.getElementById('sheetBody'); body.innerHTML = '';
+
+  const hd = elm('div','listhdr');
+  const hl = elm('span'); hl.textContent = `Nodes (${cat.nodes.length})`;
+  const hr = elm('span','hr'); hr.textContent = 'Connections';
+  hd.append(hl, hr); body.append(hd);
+  const list = elm('div','nodelist');
+  cat.nodes.slice().sort((a,b) => (b.degree||0) - (a.degree||0)).forEach(nd => {
+    const row = elm('div','noderow');
+    const dot = elm('span','rdot'); dot.style.background = nd.color;
+    const nm = elm('span','rname'); nm.textContent = nd.name;
+    const dg = elm('span','rdeg'); dg.textContent = nd.degree != null ? nd.degree : '';
+    row.append(dot, nm, dg);
+    row.addEventListener('click', () => openSheet(nd));
+    list.append(row);
+  });
+  body.append(list);
+
+  sheet.classList.add('open'); sheetOpen = true;
+}
+function closeSheet(){ sheet.classList.remove('open'); sheetOpen=false; setSelectedNode(null); }
+document.getElementById('sheetClose').addEventListener('click', closeSheet);
+document.getElementById('sheetLocate').addEventListener('click', () => {
+  const p = sheetTarget, n = sheetNode;
+  closeSheet();
+  if (!p) return;
+  if (n) setSelectedNode(n);   // re-select: highlight ring + forced-visible capsule + lit edges
+  locate(p);
+});
+
+/* ----------------------------------------------------------------------
+ * 11. UI wiring
+ * -------------------------------------------------------------------- */
+let curSpread = 1.0, curFit = 1.0, autoRotate = true;
+
+// the old preset row now holds a category legend, filled once data loads
+function buildLegend(){
+  const seg = document.getElementById('presets');
+  seg.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;background:transparent;padding:0;max-width:86vw';
+  seg.innerHTML = '';
+  RAW.cats.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'lchip';
+    chip.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:${c.color}"></span>${c.name} ${c.nodes.length}`;
+    seg.append(chip);
+  });
+}
+
+const fitEl = document.getElementById('fit'), spreadEl = document.getElementById('spread');
+fitEl.addEventListener('input', () => { curFit = +fitEl.value; document.getElementById('fitVal').textContent = curFit.toFixed(2)+'×'; applyZoomRangeAndFit(curFit, true); });
+spreadEl.addEventListener('input', () => { curSpread = +spreadEl.value; document.getElementById('spreadVal').textContent = curSpread.toFixed(2)+'×'; });
+spreadEl.addEventListener('change', () => rebuild(true));
+
+document.getElementById('lod').addEventListener('click', e => { cullEnabled = !cullEnabled; cullDirty = true; e.target.classList.toggle('on', cullEnabled); });
+document.getElementById('rot').addEventListener('click', e => { autoRotate = !autoRotate; e.target.classList.toggle('on', autoRotate); });
+document.getElementById('refit').addEventListener('click', () => unfocusToOverview());
+document.getElementById('refitBtn').addEventListener('click', () => unfocusToOverview());
+// the settings console lives behind a DOUBLE-tap on the title (generous hit area, no visible chrome)
+let lastTitleTap = 0;
+document.getElementById('titleTap').addEventListener('click', () => {
+  const now = performance.now();
+  if (now - lastTitleTap < 350){
+    lastTitleTap = 0;
+    const hidden = document.getElementById('panel').classList.toggle('hidden');
+    document.getElementById('datasetTabs').style.display = hidden ? 'none' : 'flex';   // tabs follow the panel
+  } else lastTitleTap = now;
+});
+
+document.querySelectorAll('#themeSeg button').forEach(b => b.addEventListener('click', () => {
+  if (b.classList.contains('on')) return;
+  themeKey = b.dataset.th; theme = THEMES[themeKey];
+  document.documentElement.className = 'theme-' + themeKey;
+  document.body.className = 'theme-' + themeKey;
+  document.getElementById('themeColor').setAttribute('content', themeKey === 'light' ? '#efeee9' : '#0e0f12');
+  document.querySelectorAll('#themeSeg button').forEach(x => x.classList.toggle('on', x === b));
+  if (lastRaw){ RAW = parseSource(lastRaw); buildLegend(); rebuild(false); }
+}));
+
+/* ---- search (top-left) → centre the chosen node ---- */
+const searchEl = document.getElementById('search');
+function openSearch(){ searchEl.classList.add('open'); const i = document.getElementById('searchInput'); i.value=''; renderSearch(''); setTimeout(()=>i.focus(), 60); }
+function closeSearch(){ searchEl.classList.remove('open'); }
+function renderSearch(q){
+  const res = document.getElementById('searchResults'); res.innerHTML = '';
+  if (!RAW) return;
+  q = q.trim().toLowerCase();
+  let list = q ? RAW.allNodes.filter(n => (n.name||'').toLowerCase().includes(q)) : RAW.allNodes;
+  list = list.slice().sort((a,b) => (b.degree||0) - (a.degree||0)).slice(0, 60);
+  if (!list.length){ const e = elm('div','sempty'); e.textContent = q ? 'No matches' : ''; res.append(e); return; }
+  list.forEach(n => {
+    const row = elm('div','sres');
+    const dot = elm('span','rdot'); dot.style.background = n.color;
+    const nm = elm('span','rname'); nm.textContent = n.name;
+    const ct = elm('span','rcat'); ct.textContent = n.catName || '';
+    row.append(dot, nm, ct);
+    row.addEventListener('click', () => {
+      closeSearch();
+      setSelectedNode(n);
+      locate(n.pos, detailDistance());      // centre + zoom so its capsule shows
+    });
+    res.append(row);
+  });
+}
+document.getElementById('searchBtn').addEventListener('click', openSearch);
+document.getElementById('searchCancel').addEventListener('click', closeSearch);
+document.getElementById('searchInput').addEventListener('input', e => renderSearch(e.target.value));
+
+const hud = document.getElementById('hud');
+function updateHud(){
+  if (!currentData) return;
+  const d = camera.position.distanceTo(controls.target);
+  const zoomPct = Math.round((window._fitDist / d) * 100);
+  const tier = curTier <= 0.05 ? 'Overview' : `Detail ${Math.round(curTier*100)}%`;
+  hud.innerHTML =
+    `group <b>${RAW.groupId || '—'}</b> · categories <b>${currentData.cats.length}</b> · nodes <b>${currentData.allNodes.length}</b> · edges <b>${currentData.relLinks.length}</b><br>` +
+    `tier <b>${tier}</b> · capsules <b>${visibleCaps}</b>/${currentData.allNodes.length + currentData.cats.length} · zoom <b>${zoomPct}%</b> · range <b>${Math.round(controls.minDistance)}–${Math.round(controls.maxDistance)}</b>`;
+}
+
+let hintTimer;
+const DEFAULT_HINT = '1 finger rotate · pinch zoom · tap a node · tap a category · double-tap the title for settings';
+function hideHint(){ const h=document.getElementById('hint'); h.style.opacity='0'; }
+function resetHint(msg){ const h=document.getElementById('hint'); h.textContent = msg || DEFAULT_HINT; h.style.opacity='1'; clearTimeout(hintTimer); hintTimer=setTimeout(hideHint, 6000); }
+
+function rebuild(animate){
+  if (intro) endIntro();   // material/mesh refs go stale across a rebuild
+  closeSheet();
+  const data = buildData(curSpread);
+  buildGraph(data);
+  applyZoomRangeAndFit(curFit, animate);
+  resetHint();
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+  cullDirty = true;
+});
+
+/* ----------------------------------------------------------------------
+ * 11b. INTRO DEMOS (this page only) — four opening-animation variants.
+ *   approach : start far out, slow drift-in; everything fades up
+ *   assemble : dots fly in from scattered space and settle on the shell
+ *   sweep    : a dawn line sweeps around the globe lighting dots as it passes
+ *   emerge   : start skimming the surface at the biggest continent, pull out
+ * -------------------------------------------------------------------- */
+const labelsEl = document.getElementById('labels');
+let intro = null, introMats = [], asmList = null, introChoice = 'approach';
+const easeIO = k => k < 0.5 ? 4*k*k*k : 1 - Math.pow(-2*k + 2, 3) / 2;
+const easeO  = k => 1 - Math.pow(1 - k, 3);
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+
+function snapshotMats(){
+  introMats = [];
+  graphGroup.traverse(o => {
+    if (!o.material) return;
+    introMats.push({ m: o.material, op: o.material.opacity != null ? o.material.opacity : 1, tr: o.material.transparent });
+    o.material.transparent = true;
+  });
+}
+function setOpacityAll(f){ for (const s of introMats) s.m.opacity = s.op * f; }
+
+function startIntro(kind){
+  if (intro) endIntro();
+  closeSheet(); tween = null;
+  snapshotMats();
+  labelsEl.style.opacity = '0';
+  controls.enabled = false;
+  hideHint();
+  const fit = window._fitDist || boundingRadius * 2.5;
+  intro = { kind, t0: performance.now(), dur: { approach: 2600, assemble: 2800, sweep: 2600, emerge: 2400, combo: 3200 }[kind], fit,
+            min0: controls.minDistance, max0: controls.maxDistance };
+  controls.minDistance = planetR * 1.05; controls.maxDistance = fit * 3;   // let the intro fly outside the normal zoom range
+  setOpacityAll(0);
+
+  if (kind === 'assemble' || kind === 'combo'){
+    asmList = [...nodeMeshes, ...catMeshes].map(m => {
+      const id = '' + (m.userData.data.id || m.userData.data.key || m.uuid);
+      const h1 = hash01(id), h2 = hash01(id + 'x'), h3 = hash01(id + 'y');
+      const th = h1 * 6.283, ph = Math.acos(2*h2 - 1);
+      const p0 = new THREE.Vector3(Math.sin(ph)*Math.cos(th), Math.cos(ph), Math.sin(ph)*Math.sin(th))
+        .multiplyScalar(planetR * (2.1 + 1.5*h3));
+      return { m, p1: m.position.clone(), p0, st: 0.4 * h2 };       // st = per-dot stagger
+    });
+  }
+  if (kind === 'sweep'){
+    intro.dots = [...nodeMeshes, ...catMeshes].map(m => {
+      const list = [];
+      m.traverse(o => { if (o.material) list.push({ m: o.material, op: o.material.opacity != null ? o.material.opacity : 1 }); });
+      return { az: Math.atan2(m.position.x, m.position.z) + Math.PI, list };   // azimuth 0..2π
+    });
+  }
+  if (kind === 'emerge'){
+    const big = currentData.cats.find(c => c.pos);
+    intro.d0 = big ? big.pos.clone().normalize() : new THREE.Vector3(0.3,0.4,1).normalize();
+    intro.d1 = new THREE.Vector3(0.3,0.4,1).normalize();
+  }
+}
+
+function endIntro(){
+  for (const s of introMats){ s.m.opacity = s.op; s.m.transparent = s.tr; }
+  introMats = [];
+  if (asmList){ for (const s of asmList) s.m.position.copy(s.p1); asmList = null; }
+  controls.minDistance = intro.min0; controls.maxDistance = intro.max0;
+  labelsEl.style.opacity = '1';
+  controls.enabled = true;
+  intro = null;
+  resetHint();
+}
+
+function stepIntro(){
+  const k = clamp01((performance.now() - intro.t0) / intro.dur);
+  const e = easeIO(k), fit = intro.fit;
+
+  if (intro.kind === 'approach'){
+    // far → near with a slow yaw drift; whole scene fades up
+    const dir = new THREE.Vector3(0.3,0.4,1).normalize().applyAxisAngle(new THREE.Vector3(0,1,0), (1 - e) * 0.9);
+    camera.position.copy(dir.multiplyScalar(fit * (2.7 - 1.7 * e)));
+    setOpacityAll(clamp01(e * 1.6));
+
+  } else if (intro.kind === 'assemble'){
+    // dots visible immediately, flying home; lines fade in once most have settled
+    for (const s of introMats) s.m.opacity = s.op * (s.m.isLineBasicMaterial ? clamp01((e - 0.8) / 0.2) : clamp01(e * 3));
+    for (const s of asmList){
+      const kk = clamp01((e - s.st) / (1 - s.st));
+      s.m.position.lerpVectors(s.p0, s.p1, easeO(kk));
+    }
+
+  } else if (intro.kind === 'sweep'){
+    // base layer (globe shell, stars) fades with progress; lines late; dots lit by the sweep line
+    setOpacityAll(clamp01(e * 1.4));
+    for (const s of introMats) if (s.m.isLineBasicMaterial) s.m.opacity = s.op * clamp01((e - 0.55) / 0.45);
+    const sweepAngle = e * 6.283 * 1.05;
+    for (const d of intro.dots){
+      const lit = clamp01((sweepAngle - d.az) / 0.7);
+      for (const x of d.list) x.m.opacity = x.op * lit;
+    }
+
+  } else if (intro.kind === 'combo'){
+    // E = A + B: camera flies in from afar WHILE the dots fly home onto the shell
+    const dir = new THREE.Vector3(0.3,0.4,1).normalize().applyAxisAngle(new THREE.Vector3(0,1,0), (1 - e) * 0.9);
+    camera.position.copy(dir.multiplyScalar(fit * (2.4 - 1.4 * e)));
+    for (const s of introMats) s.m.opacity = s.op * (s.m.isLineBasicMaterial ? clamp01((e - 0.8) / 0.2) : clamp01(e * 2.5));
+    for (const s of asmList){
+      const kk = clamp01((e - s.st) / (1 - s.st));
+      s.m.position.lerpVectors(s.p0, s.p1, easeO(kk));
+    }
+
+  } else if (intro.kind === 'emerge'){
+    // skim the biggest continent, then arc out to the overview
+    const dot = Math.max(-1, Math.min(1, intro.d0.dot(intro.d1)));
+    const om = Math.acos(dot);
+    let dir;
+    if (om < 1e-3) dir = intro.d1.clone();
+    else {
+      const so = Math.sin(om), w0 = Math.sin((1 - e) * om) / so, w1 = Math.sin(e * om) / so;
+      dir = new THREE.Vector3(
+        intro.d0.x*w0 + intro.d1.x*w1, intro.d0.y*w0 + intro.d1.y*w1, intro.d0.z*w0 + intro.d1.z*w1);
+    }
+    camera.position.copy(dir.multiplyScalar(planetR * 1.14 + (fit - planetR * 1.14) * e));
+    setOpacityAll(clamp01(0.3 + e * 0.7 + 0.4 * (1 - e)));   // mostly visible from the first frame
+  }
+
+  controls.target.set(0,0,0);
+  if (k >= 1) endIntro();
+}
+
+document.querySelectorAll('#introBar button').forEach(b => b.addEventListener('click', () => {
+  introChoice = b.dataset.i;
+  document.querySelectorAll('#introBar button').forEach(x => x.classList.toggle('on', x === b));
+  applyZoomRangeAndFit(curFit, false);   // reset camera so each replay starts identically
+  startIntro(introChoice);
+}));
+
+/* ----------------------------------------------------------------------
+ * 12. Boot — dataset tabs, load the selected source, build & run
+ * -------------------------------------------------------------------- */
+function buildDatasetTabs(){
+  const bar = document.getElementById('datasetTabs');
+  bar.innerHTML = '';
+  DATASETS.forEach(ds => {
+    const b = document.createElement('button');
+    b.textContent = ds.label;
+    if (ds.key === curDataset) b.classList.add('on');
+    b.addEventListener('click', () => { if (ds.key !== curDataset) loadDataset(ds.key); });
+    bar.append(b);
+  });
+}
+function loadDataset(key){
+  const ds = DATASETS.find(d => d.key === key) || DATASETS[0];
+  curDataset = ds.key;
+  buildDatasetTabs();
+  const ld = document.getElementById('loading');
+  ld.style.display = 'flex'; ld.textContent = 'loading ' + ds.label + '…';
+  return fetch(ds.url)
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(t => {
+      lastRaw = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1));   // tolerate stray prefix / md fences
+      RAW = parseSource(lastRaw);
+      buildLegend();
+      rebuild(false);
+      ld.style.display = 'none';
+      startIntro(introChoice);   // demo page: play the chosen opening on every load
+    })
+    .catch(err => { ld.style.display = 'flex'; ld.textContent = 'Failed to load ' + ds.url + ' — ' + err.message; });
+}
+
+// headless-test hook: lets tooling drive frames manually when rAF is throttled (hidden tab)
+window._dbg = { camera, controls, frame, startIntro, get intro(){ return intro && intro.kind; }, get sel(){ return selectedNode && selectedNode.name; }, get tween(){ return !!tween; }, get hiEdges(){ return hiLine ? hiLine.geometry.attributes.position.count : 0; } };
+loadDataset(curDataset).then(() => loop());
+</script>
+</body>
+</html>

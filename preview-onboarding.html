@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0e0f12" />
+<title>Vonder · Memory Graph — onboarding</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Helvetica Neue", sans-serif;
+    color: #e9eaf0; background: #0e0f12; overscroll-behavior: none;
+  }
+  #scene { position: fixed; inset: 0; touch-action: none; }
+  #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+
+  /* per-node name capsule — pulses in as each memory is added */
+  .cap {
+    pointer-events: none; white-space: nowrap; border-radius: 999px;
+    transform: translate(-50%, -50%); user-select: none; line-height: 1;
+    font-size: 12px; font-weight: 600; padding: 5px 11px 5px 9px;
+    display: flex; align-items: center; gap: 6px;
+    color: #f1eee6; background: rgba(20,22,27,.92); border: 1px solid rgba(255,255,255,.14);
+    box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  }
+  .cap .dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+
+  /* ---------- locked shell ---------- */
+  #shell {
+    position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    padding: 0 34px calc(env(safe-area-inset-bottom) + 30px);
+    background: radial-gradient(ellipse at 50% 42%, rgba(14,15,18,.30) 0%, rgba(14,15,18,.72) 58%, rgba(14,15,18,.92) 100%);
+    transition: opacity .55s ease; opacity: 1;
+  }
+  #shell.hide { opacity: 0; pointer-events: none; }
+  .ring { position: relative; width: 132px; height: 132px; margin-bottom: 26px; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .rtxt { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring .rnum { font-size: 30px; font-weight: 700; letter-spacing: -.5px; }
+  .ring .rden { font-size: 12px; color: #8d90a0; margin-top: 2px; letter-spacing: .3px; }
+  #shell h1 { font-size: 22px; font-weight: 600; letter-spacing: -.2px; margin: 0 0 12px; color: #f1eee6; }
+  #shell p { font-size: 14px; line-height: 1.55; color: #9a9db0; margin: 0 0 30px; max-width: 300px; }
+  #shell .cta {
+    border: 0; font-family: inherit; font-size: 14.5px; font-weight: 600; color: #fff;
+    background: #7d8aa8; padding: 13px 26px; border-radius: 13px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  }
+  #shell .cta:active { transform: translateY(1px); }
+  #shell .foot { margin-top: 20px; font-size: 11.5px; color: #6a6d80; letter-spacing: .3px; }
+
+  /* ---------- preview chrome ---------- */
+  #pvTop {
+    position: fixed; top: env(safe-area-inset-top); left: 0; right: 0; z-index: 25;
+    display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+    opacity: 0; transition: opacity .45s ease; pointer-events: none;
+  }
+  #pvTop.show { opacity: 1; }
+  #pvTop .back {
+    pointer-events: auto; display: inline-flex; align-items: center; gap: 6px;
+    border: 0; background: rgba(20,22,27,.6); backdrop-filter: blur(8px); color: #e9eaf0;
+    font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 14px 8px 10px; border-radius: 11px; cursor: pointer;
+  }
+  #pvTop .badge {           /* just explanatory text, not a button */
+    font-size: 12.5px; font-weight: 500; color: #8d90a0; letter-spacing: .1px; padding-right: 4px;
+  }
+  #tlHead { display: flex; align-items: center; justify-content: space-between; min-height: 32px; margin: 0 2px 12px 0; }
+  #tlCall { font-size: 13px; color: #9aa0b5; font-variant-numeric: tabular-nums; }
+  #tlCall b { color: #f1eee6; font-weight: 700; }
+  #replayBtn {              /* appears on the right once the journey finishes */
+    display: none; align-items: center; gap: 6px; border: 0; cursor: pointer; font-family: inherit;
+    font-size: 12.5px; font-weight: 600; color: #14161c; background: #f1eee6;
+    padding: 7px 14px 7px 12px; border-radius: 10px;
+  }
+  #replayBtn.show { display: inline-flex; }
+  #replayBtn:active { transform: scale(.97); }
+
+  /* ---------- timeline ---------- */
+  #timeline {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
+    padding: 16px 20px calc(env(safe-area-inset-bottom) + 18px);
+    background: linear-gradient(0deg, rgba(8,9,12,.92) 0%, rgba(8,9,12,.6) 70%, rgba(8,9,12,0) 100%);
+    transform: translateY(110%); transition: transform .5s cubic-bezier(.22,1,.36,1);
+  }
+  #timeline.show { transform: translateY(0); }
+  #tlRow { display: flex; align-items: center; }
+  #track { position: relative; flex: 1; height: 30px; cursor: pointer; touch-action: none; }
+  #track .rail { position: absolute; top: 13px; left: 0; right: 0; height: 4px; border-radius: 2px; background: rgba(255,255,255,.14); }
+  #track .fill { position: absolute; top: 13px; left: 0; height: 4px; border-radius: 2px; background: #7d8aa8; width: 0; }
+  #track .thumb {
+    position: absolute; top: 15px; left: 0; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; transform: translate(-50%, -50%); box-shadow: 0 2px 8px rgba(0,0,0,.5);
+  }
+  #track .tick { position: absolute; top: 9px; width: 2px; height: 12px; border-radius: 1px; background: rgba(255,255,255,.22); transform: translateX(-50%); }
+  #tlLabels { display: flex; justify-content: space-between; margin: 10px 0 0 0; }
+  #tlLabels span { font-size: 10.5px; color: #8d90a0; letter-spacing: .2px; }
+  #tlLabels span.on { color: #f1eee6; font-weight: 600; }
+
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #6a6d80; font-size: 13px; z-index: 40; pointer-events: none; }
+</style>
+</head>
+<body class="theme-dark">
+  <canvas id="scene"></canvas>
+  <div id="labels"></div>
+
+  <!-- locked shell -->
+  <div id="shell">
+    <div class="ring">
+      <svg width="132" height="132" viewBox="0 0 132 132">
+        <circle cx="66" cy="66" r="60" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="8"/>
+        <circle id="ringProg" cx="66" cy="66" r="60" fill="none" stroke="#7d8aa8" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
+      </svg>
+      <div class="rtxt"><div class="rnum" id="ringNum">12</div><div class="rden">of 50</div></div>
+    </div>
+    <h1>Your Memory Graph is forming</h1>
+    <p>VONDER is quietly learning what matters to you. Your graph unlocks at <b style="color:#c9cbd6">20 memories</b>.</p>
+    <button class="cta" id="previewBtn">Preview the journey
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+    </button>
+    <div class="foot">See how it grows as you wear VONDER</div>
+  </div>
+
+  <!-- preview chrome -->
+  <div id="pvTop">
+    <button class="back" id="backBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+    <span class="badge">Sample Memory Graph</span>
+  </div>
+
+  <div id="timeline">
+    <div id="tlHead">
+      <div id="tlCall"><b>Day 1</b> · 1 memory</div>
+      <button id="replayBtn" aria-label="Replay">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Replay
+      </button>
+    </div>
+    <div id="tlRow">
+      <div id="track">
+        <div class="rail"></div><div class="fill" id="tlFill"></div>
+        <div class="thumb" id="tlThumb"></div>
+      </div>
+    </div>
+    <div id="tlLabels"><span data-t="0">Day 1</span><span data-t="0.34">Week 1</span><span data-t="0.67">Month 1</span><span data-t="1">Month 3</span></div>
+  </div>
+
+  <div id="loading">loading…</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://esm.sh/three@0.160.0",
+  "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* ---------------- config (matches the mainline planet) ---------------- */
+const UNIT = 60, DATA_URL = 'mockdata_onboarding.md';
+const UNLOCK_N = 20, SEED_N = 8;            // shell copy: "8 / 20"
+const FLY = 0.05;                           // fly-in ("吸附") window, in growT
+const TYPE_CAT = { Person:'Person', Organization:'Organization', Place:'Place' };
+const PALETTE = {
+  cat:    { Person:'#8198bd', Organization:'#c08aa2', Place:'#82ac99', Others:'#9a9ca0' },
+  topics: ['#c0a875','#929ec8','#86b0a0','#c89a86','#a892b6','#8ab0c0','#c4b486','#9aa6c4'],
+  line: 0x6f6480, bg: 0x0e0f12,
+  globe: { fill:0x223047, fillOpacity:0.012, rim:0x5a78b0, rimAlpha:0.09 },
+};
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const titleCase = s => s.charAt(0).toUpperCase() + s.slice(1);
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const smooth = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t*t*(3 - 2*t); };
+function hash01(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return ((h>>>0)%100000)/100000; }
+function fibDir(idx, count){
+  const k = idx + 0.5, c = Math.max(-1, Math.min(1, 1 - 2*k/count));
+  const phi = Math.acos(c), th = Math.PI*(1+Math.sqrt(5))*k;
+  return new THREE.Vector3(Math.sin(phi)*Math.cos(th), Math.cos(phi), Math.sin(phi)*Math.sin(th));
+}
+function deriveCat(n){
+  const t = n.entity_type;
+  if (TYPE_CAT[t]) return t;
+  if (t === 'Topic') return (n.attributes && n.attributes.category) || 'Others';
+  return 'Others';
+}
+
+/* ---------------- scene ---------------- */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+const labelRenderer = new CSS2DRenderer({ element: document.getElementById('labels') });
+labelRenderer.setSize(innerWidth, innerHeight);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(PALETTE.bg);
+scene.fog = new THREE.Fog(PALETTE.bg, 1, 1e6);
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 1, 60000);
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+
+const haloTex = new THREE.TextureLoader().load('halo.png');
+const graph = new THREE.Group(); scene.add(graph);
+
+let planetR = 200, boundingR = 240, fitDist = 800, sizeK = 1;
+let nodeItems = [], edgeMat = null;
+let bfSorted = [];                         // sorted node birth fractions, for live counting
+
+/* ---------------- build the planet ---------------- */
+function build(raw){
+  // 1. parse → categories + edges (same scheme as the mainline)
+  const byId = new Map(); (raw.nodes||[]).forEach(n => byId.set(n.id, n));
+  const groups = new Map();
+  (raw.nodes||[]).forEach(n => { const k = deriveCat(n); n._cat = k; n._jit = hash01(n.id);
+    if (!groups.has(k)) groups.set(k, []); groups.get(k).push(n); });
+  const rank = k => k === 'Others' ? 99 : (TYPE_CAT[k] ? 0 : 1);
+  let keys = [...groups.keys()].sort((a,b) => rank(a)-rank(b) || groups.get(b).length-groups.get(a).length);
+  const pIdx = keys.indexOf('Person'); if (pIdx>=0){ keys.splice(pIdx,1); keys.push('Person'); }  // Person → bottom
+  let ti = 0;
+  const cats = keys.map(k => {
+    const color = PALETTE.cat[k] || PALETTE.topics[ti++ % PALETTE.topics.length];
+    const cat = { key:k, name: (TYPE_CAT[k]||k==='Others') ? k : titleCase(k), color, nodes: groups.get(k), pos:null };
+    cat.nodes.forEach(n => { n._color = color; }); return cat;
+  });
+  const nodes = raw.nodes || [];
+  const edges = (raw.edges||[]).filter(e => byId.has(e.source) && byId.has(e.target) && e.source!==e.target)
+    .map(e => ({ a: byId.get(e.source), b: byId.get(e.target) }));
+
+  // 2. birth fraction: high-degree (central) memories are learned first
+  const N = nodes.length;
+  const byDeg = nodes.slice().sort((a,b) => (b.degree||0)-(a.degree||0));
+  byDeg.forEach((n, i) => { const r = i/Math.max(1,N-1);
+    n._bf = clamp01(Math.pow(r, 0.85) + (hash01(n.id+'b')-0.5)*0.10); });
+  byDeg[0]._bf = 0;                                            // the very first memory exists at t=0
+  bfSorted = nodes.map(n => n._bf).sort((a,b)=>a-b);
+  const seedFrac = bfSorted[Math.min(SEED_N, N)-1] || 0.15;    // growT that yields ~SEED_N nodes
+
+  // 3. shell layout (identical to the mainline)
+  const realCats = cats.filter(c => c.key !== 'Others'), others = cats.find(c => c.key === 'Others');
+  const numCaps = Math.max(realCats.length, 1);
+  const R = UNIT * (1.0 + 0.22*Math.sqrt(Math.max(N,1)));
+  const maxN = Math.max(1, ...realCats.map(c => c.nodes.length)), caps = [];
+  realCats.forEach((cat, i) => {
+    const c = fibDir(i, numCaps); cat.pos = c.clone().multiplyScalar(R);
+    const ref = Math.abs(c.y) < 0.99 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(1,0,0);
+    const u = new THREE.Vector3().crossVectors(c, ref).normalize();
+    const v = new THREE.Vector3().crossVectors(c, u).normalize();
+    const n = cat.nodes.length, alpha = 0.5*Math.sqrt(n/maxN); caps.push({ c, alpha });
+    cat.nodes.forEach((node, j) => {
+      const beta = alpha*Math.sqrt((j+0.5)/n)*(0.82 + 0.36*node._jit), phi = GOLDEN_ANGLE*j + node._jit*6.283;
+      node.pos = c.clone().multiplyScalar(Math.cos(beta))
+        .addScaledVector(u, Math.sin(beta)*Math.cos(phi)).addScaledVector(v, Math.sin(beta)*Math.sin(phi))
+        .multiplyScalar(R);
+    });
+  });
+  if (others && others.nodes.length){
+    const m = others.nodes.length, cand = Math.ceil(m*3)+16, ocean = [];
+    for (let s=0;s<cand;s++){ const c = fibDir(s, cand); let inside = false;
+      for (const cap of caps){ if (c.dot(cap.c) > Math.cos(cap.alpha*1.15)){ inside = true; break; } }
+      if (!inside) ocean.push(c); }
+    const step = ocean.length/m;
+    for (let k=0;k<m;k++){ const c = ocean.length>=m ? ocean[Math.floor(k*step)] : fibDir(k,m);
+      others.nodes[k].pos = c.clone().multiplyScalar(R); }
+  }
+
+  planetR = R; boundingR = R*1.15; sizeK = R/(UNIT*4.5);
+  const vFov = camera.fov*Math.PI/180, hFov = 2*Math.atan(Math.tan(vFov/2)*Math.min(1,camera.aspect));
+  fitDist = (boundingR/Math.sin(Math.min(vFov,hFov)/2)) * 1.0;
+
+  // 4. globe shell
+  const fill = new THREE.Mesh(new THREE.SphereGeometry(R*0.98, 48, 32),
+    new THREE.MeshBasicMaterial({ color:PALETTE.globe.fill, transparent:true, opacity:PALETTE.globe.fillOpacity, side:THREE.BackSide, depthWrite:false }));
+  graph.add(fill);
+  const rim = new THREE.Mesh(new THREE.SphereGeometry(R*1.005, 48, 32), new THREE.ShaderMaterial({
+    transparent:true, side:THREE.BackSide, blending:THREE.AdditiveBlending, depthWrite:false,
+    uniforms:{ rimColor:{value:new THREE.Color(PALETTE.globe.rim)}, rimAlpha:{value:PALETTE.globe.rimAlpha} },
+    vertexShader:'varying vec3 vN; varying vec3 vV; void main(){ vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); vV=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }',
+    fragmentShader:'uniform vec3 rimColor; uniform float rimAlpha; varying vec3 vN; varying vec3 vV; void main(){ float r=pow(1.0-abs(dot(normalize(vN),normalize(vV))),3.0); gl_FragColor=vec4(rimColor, r*rimAlpha); }'
+  })); graph.add(rim);
+
+  // 5. nodes (glowing dots, no labels) — fade in by birth fraction
+  const sphereGeo = new THREE.SphereGeometry(1, 12, 12);
+  nodes.forEach(n => {
+    const col = new THREE.Color(n._color);
+    const mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0 });
+    const mesh = new THREE.Mesh(sphereGeo, mat); mesh.position.copy(n.pos); mesh.scale.setScalar(3.6*sizeK);
+    graph.add(mesh);
+    const glowMat = new THREE.SpriteMaterial({ map:haloTex, color:col, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false });
+    const glow = new THREE.Sprite(glowMat); glow.scale.setScalar(13*sizeK); mesh.add(glow);
+    // name capsule sits on the dot; opacity is driven per-frame (pulse around birth)
+    const cap = document.createElement('div'); cap.className = 'cap';
+    const cdot = document.createElement('span'); cdot.className = 'dot'; cdot.style.background = n._color;
+    const nm = document.createElement('span'); nm.textContent = n.name;
+    cap.append(cdot, nm);
+    const lbl = new CSS2DObject(cap); lbl.center.set(0.5, 0.5); mesh.add(lbl);
+    nodeItems.push({ bf:n._bf, mat, glowMat, el:cap, lbl, mesh, w:null, h:null,
+      name:n.name, color:n._color, pos:n.pos.clone(), spawn:n.pos.clone().multiplyScalar(1.4) });
+  });
+
+  // 6. relationship arcs — ONE geometry, per-vertex birth, faded on the GPU by uGrowT
+  const pos = [], birth = [];
+  const na = new THREE.Vector3(), nb = new THREE.Vector3(), pp = new THREE.Vector3(), pc = new THREE.Vector3();
+  edges.forEach(({a,b}) => {
+    const ebf = Math.max(a._bf, b._bf) + FLY;   // appear once both endpoints have landed
+    na.copy(a.pos).normalize(); nb.copy(b.pos).normalize();
+    const dot = Math.max(-1, Math.min(1, na.dot(nb))), omega = Math.acos(dot), so = Math.sin(omega);
+    const rr = ((a.pos.length()+b.pos.length())*0.5)*1.006;
+    const push = (v) => { pos.push(v.x,v.y,v.z); birth.push(ebf); };
+    if (so < 1e-3){ push(a.pos); push(b.pos); return; }
+    const K = Math.min(24, Math.max(2, Math.ceil(omega/0.18))); let prev = false;
+    for (let i=0;i<=K;i++){ const t=i/K, w0=Math.sin((1-t)*omega)/so, w1=Math.sin(t*omega)/so;
+      pc.set(na.x*w0+nb.x*w1, na.y*w0+nb.y*w1, na.z*w0+nb.z*w1).multiplyScalar(rr);
+      if (prev){ push(pp); push(pc); } pp.copy(pc); prev = true; }
+  });
+  const eg = new THREE.BufferGeometry();
+  eg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  eg.setAttribute('aBirth', new THREE.Float32BufferAttribute(birth, 1));
+  edgeMat = new THREE.ShaderMaterial({
+    transparent:true, depthWrite:false,
+    uniforms:{ uGrowT:{value:0}, uColor:{value:new THREE.Color(PALETTE.line)}, uOpacity:{value:0.34} },
+    vertexShader:'attribute float aBirth; varying float vB; void main(){ vB=aBirth; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader:'uniform float uGrowT; uniform vec3 uColor; uniform float uOpacity; varying float vB; void main(){ float a=smoothstep(vB-0.05, vB+0.01, uGrowT); if(a<=0.001) discard; gl_FragColor=vec4(uColor, a*uOpacity); }'
+  });
+  graph.add(new THREE.LineSegments(eg, edgeMat));
+
+  // (categories drive layout + node colour only — no on-screen category element)
+  document.getElementById('loading').style.display = 'none';
+}
+
+/* ---------------- growth state ---------------- */
+let growT = 0, targetT = 0, playing = false, theta = 0, phi = 1.18, dragging = false, camDist = 0;
+const wp = new THREE.Vector3(), tmp = new THREE.Vector3(), scr = { x:0, y:0 };
+
+function aliveNodeCount(t){ let lo=0, hi=bfSorted.length; while(lo<hi){ const m=(lo+hi)>>1; if(bfSorted[m]<=t) lo=m+1; else hi=m; } return lo; }
+
+const cells = new Map(), CELL = 90;
+function project(v){ tmp.copy(v).project(camera); if (tmp.z>1) return false;
+  scr.x=(tmp.x*0.5+0.5)*innerWidth; scr.y=(-tmp.y*0.5+0.5)*innerHeight; return true; }
+
+// Show the NAME of whichever node is being added right now: each label pulses up
+// as growT crosses its birth fraction, then fades as the frontier moves on.
+// Greedy non-overlap, strongest pulse (most-recent) wins the space.
+function placeLabels(){
+  cells.clear();
+  const cand = [];
+  for (const it of nodeItems){
+    // hold the name through the fly-in, then fade as the frontier moves on
+    const pulse = smooth(it.bf, it.bf+0.01, growT) * (1 - smooth(it.bf+FLY+0.05, it.bf+FLY+0.16, growT));
+    it._lab = pulse; it._labOn = 0;
+    if (pulse > 0.02) cand.push(it);
+  }
+  cand.sort((a,b) => b._lab - a._lab);
+  const hit = (x,y,w,h) => { const x0=Math.floor((x-w/2)/CELL),x1=Math.floor((x+w/2)/CELL),y0=Math.floor((y-h/2)/CELL),y1=Math.floor((y+h/2)/CELL);
+    for(let cx=x0;cx<=x1;cx++)for(let cy=y0;cy<=y1;cy++){ const a=cells.get(cx*9301+cy); if(a) for(const o of a){ if(Math.abs(o.x-x)<(o.w+w)/2+6 && Math.abs(o.y-y)<(o.h+h)/2+6) return true; } } return false; };
+  const ins = (x,y,w,h)=>{ const x0=Math.floor((x-w/2)/CELL),x1=Math.floor((x+w/2)/CELL),y0=Math.floor((y-h/2)/CELL),y1=Math.floor((y+h/2)/CELL);
+    for(let cx=x0;cx<=x1;cx++)for(let cy=y0;cy<=y1;cy++){ const k=cx*9301+cy; let a=cells.get(k); if(!a){a=[];cells.set(k,a);} a.push({x,y,w,h}); } };
+  for (const it of cand){
+    it.mesh.getWorldPosition(wp);
+    const front = wp.dot(camera.position)/(wp.length()*camera.position.length()) > wp.length()/camera.position.length() - 0.02;
+    if (it.w == null && it.el.offsetWidth){ it.w = it.el.offsetWidth; it.h = it.el.offsetHeight; }
+    let on = front && it.w != null && project(wp);
+    if (on && hit(scr.x, scr.y, it.w, it.h)) on = false;
+    if (on){ ins(scr.x, scr.y, it.w, it.h); it._labOn = it._lab;
+      // anchor the capsule toward screen centre so edge names never clip off-screen
+      it.lbl.center.set(scr.x > innerWidth*0.58 ? 1.04 : scr.x < innerWidth*0.42 ? -0.04 : 0.5, 0.5);
+    }
+  }
+}
+
+function applyGrowth(){
+  const fly = playing;                          // auto-play absorbs; scrubbing shows nodes in place
+  const shellMode = mode === 'shell';           // landing: white, slightly brighter dots
+  for (const it of nodeItems){
+    const a = smooth(it.bf-0.01, it.bf+0.03, growT);     // dot appears as the memory lands
+    it.mat.opacity = a; it.glowMat.opacity = a * (shellMode ? 0.6 : 0.45);
+    it.mat.color.set(shellMode ? '#ffffff' : it.color);
+    it.glowMat.color.set(shellMode ? '#ffffff' : it.color);
+    if (fly){ const k = 1 - Math.pow(1 - smooth(it.bf, it.bf+FLY, growT), 3);   // ease-out "absorb"
+      it.mesh.position.lerpVectors(it.spawn, it.pos, k); }
+    else it.mesh.position.copy(it.pos);
+  }
+  if (edgeMat) edgeMat.uniforms.uGrowT.value = growT;
+  placeLabels();
+  const labelsOn = mode === 'preview';   // shell stays a calm "forming" haze — dots only, no names
+  for (const it of nodeItems) it.el.style.opacity = (labelsOn ? (it._labOn || 0) : 0).toFixed(3);
+}
+
+/* ---------------- camera + loop ---------------- */
+function updateCamera(){
+  // Landing zooms in ~2× (planet overflows the screen, dots scattered); preview sits at fit.
+  // Within the timeline the planet never scales — only this mode switch eases the distance.
+  const target = (mode === 'shell') ? fitDist*0.5 : fitDist;
+  camDist = camDist === 0 ? target : camDist + (target - camDist) * 0.08;
+  const dist = camDist;
+  camera.position.set(Math.sin(phi)*Math.sin(theta)*dist, Math.cos(phi)*dist, Math.sin(phi)*Math.cos(theta)*dist);
+  camera.lookAt(0,0,0);
+  const d = dist; scene.fog.near = Math.max(d - boundingR*0.5, 1); scene.fog.far = d + boundingR*1.55;
+}
+let last = performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt = Math.max(0, Math.min(0.05, (now-last)/1000)); last = now;   // clamp both ends (never rewind on a clock hiccup)
+  if (!dragging) theta += dt * 0.12;                          // slow auto-rotate (pauses while dragging)
+  if (playing){ growT = Math.min(1, growT + dt/14); if (growT >= 1){ targetT = 1; setPlaying(false); } }   // ~14s sweep, then hold at full
+  else growT += (targetT - growT) * Math.min(1, dt*8);        // ease toward scrub/seed target
+  applyGrowth(); syncTimelineUI(); updateCamera();
+  renderer.render(scene, camera); labelRenderer.render(scene, camera);
+}
+
+/* ---------------- UI wiring ---------------- */
+const shell = document.getElementById('shell'), pvTop = document.getElementById('pvTop');
+const timeline = document.getElementById('timeline');
+const fillEl = document.getElementById('tlFill'), thumbEl = document.getElementById('tlThumb');
+const tlCall = document.getElementById('tlCall'), replayBtn = document.getElementById('replayBtn');
+let seedFrac = 0.15, mode = 'shell';
+
+function setPlaying(p){ playing = p; }
+function enterPreview(){ mode = 'preview'; shell.classList.add('hide');
+  pvTop.classList.add('show'); timeline.classList.add('show');
+  growT = 0; targetT = 0; setPlaying(true);                   // auto-play the full growth once
+}
+function exitPreview(){ mode = 'shell'; setPlaying(false); targetT = seedFrac;
+  shell.classList.remove('hide'); pvTop.classList.remove('show'); timeline.classList.remove('show');
+}
+document.getElementById('previewBtn').addEventListener('click', enterPreview);
+document.getElementById('backBtn').addEventListener('click', exitPreview);
+replayBtn.addEventListener('click', () => { growT = 0; targetT = 0; setPlaying(true); });
+
+// scrub
+const track = document.getElementById('track');
+function scrubTo(clientX){ const r = track.getBoundingClientRect();
+  targetT = growT = clamp01((clientX - r.left)/r.width); setPlaying(false); }
+let scrubbing = false;
+track.addEventListener('pointerdown', e => { scrubbing = true; try { track.setPointerCapture(e.pointerId); } catch(_){} scrubTo(e.clientX); });
+track.addEventListener('pointermove', e => { if (scrubbing) scrubTo(e.clientX); });
+track.addEventListener('pointerup', () => { scrubbing = false; });
+
+// drag the planet to look around (one finger) — rotate only, no node detail; auto-rotate resumes on release
+let dragX = 0, dragY = 0;
+canvas.addEventListener('pointerdown', e => { dragging = true; dragX = e.clientX; dragY = e.clientY; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove', e => { if (!dragging) return;
+  theta -= (e.clientX - dragX) * 0.006; dragX = e.clientX;
+  phi = Math.max(0.5, Math.min(Math.PI - 0.5, phi + (e.clientY - dragY) * 0.006)); dragY = e.clientY;
+});
+const endDrag = () => { dragging = false; };
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+
+// ticks + label highlight
+const labelSpans = [...document.querySelectorAll('#tlLabels span')];
+labelSpans.forEach(s => { const t = +s.dataset.t;
+  const tk = document.createElement('div'); tk.className = 'tick'; tk.style.left = (t*100)+'%'; track.append(tk);
+  s.addEventListener('click', () => { targetT = t; setPlaying(false); });
+});
+function syncTimelineUI(){
+  fillEl.style.width = (growT*100)+'%'; thumbEl.style.left = (growT*100)+'%';
+  let bi = 0; for (let i=0;i<labelSpans.length;i++) if (growT >= +labelSpans[i].dataset.t - 0.001) bi = i;
+  labelSpans.forEach((s,i) => s.classList.toggle('on', i===bi));
+  const mem = aliveNodeCount(growT);
+  tlCall.innerHTML = `<b>${labelSpans[bi].textContent}</b> · ${mem} ${mem === 1 ? 'memory' : 'memories'}`;
+  replayBtn.classList.toggle('show', mode === 'preview' && !playing);   // any non-playing moment → offer replay
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); labelRenderer.setSize(innerWidth, innerHeight);
+  nodeItems.forEach(it => { it.w = null; });   // re-measure labels after a resize
+  const vFov = camera.fov*Math.PI/180, hFov = 2*Math.atan(Math.tan(vFov/2)*Math.min(1,camera.aspect));
+  fitDist = (boundingR/Math.sin(Math.min(vFov,hFov)/2)) * 1.0;
+});
+
+/* ---------------- boot ---------------- */
+fetch(DATA_URL).then(r => r.text()).then(t => {
+  const raw = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}')+1));
+  build(raw);
+  const N = bfSorted.length;
+  seedFrac = bfSorted[Math.min(SEED_N, N)-1] || 0.15;
+  growT = targetT = seedFrac;                                 // shell shows ~SEED_N memories
+  // shell progress ring
+  const frac = Math.min(1, SEED_N/UNLOCK_N), C = 2*Math.PI*60;
+  document.getElementById('ringProg').setAttribute('stroke-dashoffset', (C*(1-frac)).toFixed(1));
+  document.getElementById('ringNum').textContent = SEED_N;
+  document.querySelector('#shell .rden').textContent = 'of ' + UNLOCK_N;
+  requestAnimationFrame(loop);
+}).catch(err => { document.getElementById('loading').textContent = 'Failed to load — ' + err.message; });
+
+window._dbg = { get growT(){ return growT; }, set growT(v){ growT = targetT = v; },
+  get mode(){ return mode; }, enterPreview, exitPreview,
+  get alive(){ return aliveNodeCount(growT); },
+  step(n){ const t0=performance.now(); for(let i=0;i<(n||60);i++) loop(t0+i*16.7); } };
+</script>
+</body>
+</html>
