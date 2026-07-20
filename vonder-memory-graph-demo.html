@@ -768,7 +768,9 @@ function loop(){
   requestAnimationFrame(loop);
   stepTween();
   controls.autoRotate = autoRotate && !pointerDown && !sheetOpen && !tween;
-  controls.enablePan = camera.position.distanceTo(controls.target) < (window._fitDist || 1e9) * 0.9;   // two-finger pan only once zoomed in
+  const zoomedIn = camera.position.distanceTo(controls.target) < (window._fitDist || 1e9) * 0.9;
+  controls.enablePan  = zoomedIn && twoFingerMode !== 'zoom';   // two-finger pan: only once zoomed in, and not mid-pinch
+  controls.enableZoom = twoFingerMode !== 'pan';                // pinch zoom: locked out while two-finger panning
   controls.update();
 
   maybeCull();
@@ -915,6 +917,34 @@ let pointerDown = false, downX=0, downY=0, downT=0, moved=0;
 
 renderer.domElement.addEventListener('pointerdown', e => { pointerDown=true; downX=e.clientX; downY=e.clientY; downT=performance.now(); moved=0; });
 renderer.domElement.addEventListener('pointermove', e => { if(pointerDown) moved=Math.max(moved, Math.hypot(e.clientX-downX, e.clientY-downY)); });
+
+// Two-finger gestures: decide ZOOM vs PAN once per gesture, then LOCK it until the fingers lift.
+// OrbitControls' stock two-finger handling is DOLLY_PAN — pinching also drags the view sideways,
+// so the two effects smear together. Here the first ~12px of movement picks the dominant intent
+// (finger-spread change → zoom, both fingers drifting together → pan) and the per-frame flags in
+// loop() disable the other one for the rest of the gesture. One finger stays pure rotate.
+let twoFingerMode = null;   // null (undecided / <2 fingers) | 'zoom' | 'pan'
+let g2Start = null;
+const g2Info = t => ({ d: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY),
+                       cx: (t[0].clientX + t[1].clientX)/2, cy: (t[0].clientY + t[1].clientY)/2 });
+renderer.domElement.addEventListener('touchstart', e => {
+  if (e.touches.length === 2){ g2Start = g2Info(e.touches); twoFingerMode = null; }
+  else { g2Start = null; twoFingerMode = null; }
+}, {passive: true});
+renderer.domElement.addEventListener('touchmove', e => {
+  if (!g2Start || twoFingerMode || e.touches.length !== 2) return;
+  const now = g2Info(e.touches);
+  const pinch = Math.abs(now.d - g2Start.d);                           // finger-spread change
+  const drift = Math.hypot(now.cx - g2Start.cx, now.cy - g2Start.cy);  // centroid movement
+  if (Math.max(pinch, drift) > 12){
+    twoFingerMode = pinch > drift ? 'zoom' : 'pan';
+    // apply the lock NOW (not on the next rAF) — the same flags loop() keeps re-asserting
+    if (twoFingerMode === 'zoom'){ controls.enablePan = false; controls.enableZoom = true; }
+    else controls.enableZoom = false;   // enablePan stays loop-managed: on when zoomed in, off at overview
+  }
+}, {passive: true});
+renderer.domElement.addEventListener('touchend',    e => { if (e.touches.length < 2){ g2Start = null; twoFingerMode = null; } }, {passive: true});
+renderer.domElement.addEventListener('touchcancel', () => { g2Start = null; twoFingerMode = null; }, {passive: true});
 function hitCapsule(px, py){
   let best = null, bestD = Infinity;
   const scan = (arr, type) => {
@@ -968,8 +998,11 @@ renderer.domElement.addEventListener('pointerup', e => {
   const catHit = ray.intersectObjects(catMeshes, false);
   if (catHit.length){ categoryTap(catHit[0].object.userData.data); hideHint(); return; }
   // 4) empty space → zoom back out (unfocusToOverview also closes any open sheet). One tap, reliable.
+  //    Also fires when the view has PANNED off the graph centre — zooming out from a corner leaves
+  //    the graph off-centre at full zoom-out, and recentring must still be one tap away.
   const overviewDist = window._fitDist || (boundingRadius*3);
-  if (camera.position.distanceTo(controls.target) < overviewDist*0.92) { unfocusToOverview(); return; }
+  const offCentre = controls.target.length() > boundingRadius * 0.02;
+  if (camera.position.distanceTo(controls.target) < overviewDist*0.92 || offCentre) { unfocusToOverview(); return; }
   if (sheetOpen) closeSheet();   // already at overview → just dismiss a lingering sheet
 });
 
@@ -1178,7 +1211,7 @@ function loadDataset(key){
     .catch(err => { ld.style.display = 'flex'; ld.textContent = 'Failed to load ' + ds.url + ' — ' + err.message; });
 }
 
-window._dbg = { camera, controls, openSheet, focusCategory, relatedNodes, nodeInComfortZone, get RAW(){ return RAW; }, get tween(){ return !!tween; },
+window._dbg = { camera, controls, openSheet, focusCategory, relatedNodes, nodeInComfortZone, get RAW(){ return RAW; }, get tween(){ return !!tween; }, get gesture(){ return twoFingerMode; },
   cat(key){ return RAW.cats.find(c => c.key === key || c.name === key); },
   get hiEdges(){ return hiLine ? hiLine.geometry.attributes.instanceStart.count : 0; },
   get opSpread(){ const o = nodeLabels.map(it=>it.mesh.material.opacity); return { min:+Math.min(...o).toFixed(2), max:+Math.max(...o).toFixed(2) }; },
