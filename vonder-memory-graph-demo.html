@@ -674,16 +674,14 @@ function focusCategory(cat){
   const dest = cat.pos.clone().addScaledVector(dir, dist);
   startTween(dest, cat.pos.clone());
 
-  controls.enablePan = true;   // zoomed in → two-finger pan allowed
   setSelected(null, cat);   // force the focused category's capsule visible & non-occluded
   autoRotate = false; document.getElementById('rot').classList.remove('on');  // stop spin while reading
-  resetHint('Drag to pan the cluster · pinch to zoom · tap a node · tap empty space to go back');
+  resetHint('Two-finger drag to pan · pinch to zoom · tap a node · tap empty space to go back');
 }
 
 // Step back up to the whole-graph overview (also the Re-fit action).
 function unfocusToOverview(){
   closeSheet();
-  controls.enablePan = false;                    // back at overview → no pan (rotate stays centred)
   setSelected(null, null);                       // leaving for the overview drops the selection
   applyZoomRangeAndFit(curFit, true);            // tween out + restore normal zoom range
   autoRotate = true; document.getElementById('rot').classList.add('on');
@@ -768,9 +766,6 @@ function loop(){
   requestAnimationFrame(loop);
   stepTween();
   controls.autoRotate = autoRotate && !pointerDown && !sheetOpen && !tween;
-  const zoomedIn = camera.position.distanceTo(controls.target) < (window._fitDist || 1e9) * 0.9;
-  controls.enablePan  = zoomedIn && twoFingerMode !== 'zoom';   // two-finger pan: only once zoomed in, and not mid-pinch
-  controls.enableZoom = twoFingerMode !== 'pan';                // pinch zoom: locked out while two-finger panning
   controls.update();
 
   maybeCull();
@@ -918,33 +913,65 @@ let pointerDown = false, downX=0, downY=0, downT=0, moved=0;
 renderer.domElement.addEventListener('pointerdown', e => { pointerDown=true; downX=e.clientX; downY=e.clientY; downT=performance.now(); moved=0; });
 renderer.domElement.addEventListener('pointermove', e => { if(pointerDown) moved=Math.max(moved, Math.hypot(e.clientX-downX, e.clientY-downY)); });
 
-// Two-finger gestures: decide ZOOM vs PAN once per gesture, then LOCK it until the fingers lift.
-// OrbitControls' stock two-finger handling is DOLLY_PAN — pinching also drags the view sideways,
-// so the two effects smear together. Here the first ~12px of movement picks the dominant intent
-// (finger-spread change → zoom, both fingers drifting together → pan) and the per-frame flags in
-// loop() disable the other one for the rest of the gesture. One finger stays pure rotate.
-let twoFingerMode = null;   // null (undecided / <2 fingers) | 'zoom' | 'pan'
-let g2Start = null;
-const g2Info = t => ({ d: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY),
-                       cx: (t[0].clientX + t[1].clientX)/2, cy: (t[0].clientY + t[1].clientY)/2 });
-renderer.domElement.addEventListener('touchstart', e => {
-  if (e.touches.length === 2){ g2Start = g2Info(e.touches); twoFingerMode = null; }
-  else { g2Start = null; twoFingerMode = null; }
-}, {passive: true});
-renderer.domElement.addEventListener('touchmove', e => {
-  if (!g2Start || twoFingerMode || e.touches.length !== 2) return;
-  const now = g2Info(e.touches);
-  const pinch = Math.abs(now.d - g2Start.d);                           // finger-spread change
-  const drift = Math.hypot(now.cx - g2Start.cx, now.cy - g2Start.cy);  // centroid movement
-  if (Math.max(pinch, drift) > 12){
-    twoFingerMode = pinch > drift ? 'zoom' : 'pan';
-    // apply the lock NOW (not on the next rAF) — the same flags loop() keeps re-asserting
-    if (twoFingerMode === 'zoom'){ controls.enablePan = false; controls.enableZoom = true; }
-    else controls.enableZoom = false;   // enablePan stays loop-managed: on when zoomed in, off at overview
+/* Two-finger gesture — maps-style continuous zoom+pan (no mode guessing).
+ * OrbitControls' stock two-finger mode is DOLLY_PAN with the zoom anchored at the SCREEN CENTRE:
+ * pinching around anything off-centre makes the content slide out from under the fingers, and
+ * classifying intent (zoom XOR pan) guesses wrong on sloppy real-world gestures. Instead we track
+ * the two touch points ourselves and, on every move, keep the graph glued to the fingers:
+ *   spread ratio   → dolly anchored at the pinch centroid (what you pinch is what grows)
+ *   centroid drift → pan, at ANY zoom level (a tap on empty space recentres if it drifts)
+ * Both channels run simultaneously and continuously — nothing to misjudge, nothing locks out.
+ * One guard: the zoom channel arms only after ~10px of deliberate spread change, so a flat
+ * two-finger drag can't slowly zoom-drift. Pan is live from the first pixel. One finger = rotate.
+ */
+controls.touches.TWO = -1;            // unknown mode → OrbitControls ignores two-finger (rotate/wheel unaffected)
+const g2P = new Map();                // active touch points: pointerId → {x, y}
+let g2 = null;                        // running baseline {d, cx, cy, d0, zoomOn} of the current 2-finger gesture
+let simVP = null;                     // TEMP test hook: {w, h} fake viewport for the 0×0 headless pane
+const g2Right = new THREE.Vector3(), g2Up = new THREE.Vector3(), g2Shift = new THREE.Vector3();
+function g2Apply(){
+  const [a, b] = [...g2P.values()];
+  const m = { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x)/2, cy: (a.y + b.y)/2 };
+  if (!g2){ g2 = { ...m, d0: m.d, zoomOn: false }; return; }
+  const W = simVP ? simVP.w : (renderer.domElement.clientWidth  || innerWidth);
+  const H = simVP ? simVP.h : (renderer.domElement.clientHeight || innerHeight);
+  if (!(H > 0) || m.d < 12){ Object.assign(g2, m); return; }
+  // Arm the zoom channel only on a DELIBERATE spread change: >12% of the starting spread
+  // (spread wobble while dragging scales with how far apart the fingers are), floor 16px.
+  if (!g2.zoomOn && Math.abs(m.d - g2.d0) > Math.max(16, g2.d0 * 0.12)){ g2.zoomOn = true; g2.d = m.d; }
+  const dist = camera.position.distanceTo(controls.target);
+  const wpp = 2 * dist * Math.tan(camera.fov * Math.PI/360) / H;   // world units per screen px at target depth
+  // 1) dolly, anchored at the pinch centroid
+  let f = 1;
+  if (g2.zoomOn){
+    f = THREE.MathUtils.clamp(g2.d / m.d, 0.75, 1.33);             // per-event ratio; bounds kill jitter spikes
+    f = THREE.MathUtils.clamp(dist * f, controls.minDistance, controls.maxDistance) / dist;
+    camera.position.sub(controls.target).multiplyScalar(f).add(controls.target);
   }
-}, {passive: true});
-renderer.domElement.addEventListener('touchend',    e => { if (e.touches.length < 2){ g2Start = null; twoFingerMode = null; } }, {passive: true});
-renderer.domElement.addEventListener('touchcancel', () => { g2Start = null; twoFingerMode = null; }, {passive: true});
+  // 2) lateral shift = follow the centroid drift + keep the point under the centroid pinned while dollying
+  g2Right.setFromMatrixColumn(camera.matrix, 0);
+  g2Up.setFromMatrixColumn(camera.matrix, 1);
+  const px = -(m.cx - g2.cx) + (1 - f) * (m.cx - W/2);   // net view shift, screen x
+  const py =  (m.cy - g2.cy) - (1 - f) * (m.cy - H/2);   // screen y is down, world up is up
+  g2Shift.copy(g2Right).multiplyScalar(px * wpp).addScaledVector(g2Up, py * wpp);
+  controls.target.add(g2Shift);
+  camera.position.add(g2Shift);
+  Object.assign(g2, m);
+}
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch') return;
+  if (e.isPrimary) g2P.clear();                          // new touch sequence → drop any stale pointers
+  g2P.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  g2 = null;                                             // finger count changed → re-baseline
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!g2P.has(e.pointerId)) return;
+  g2P.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if (g2P.size === 2) g2Apply();
+});
+const g2End = e => { g2P.delete(e.pointerId); g2 = null; };
+renderer.domElement.addEventListener('pointerup', g2End);
+renderer.domElement.addEventListener('pointercancel', g2End);
 function hitCapsule(px, py){
   let best = null, bestD = Infinity;
   const scan = (arr, type) => {
@@ -1211,7 +1238,7 @@ function loadDataset(key){
     .catch(err => { ld.style.display = 'flex'; ld.textContent = 'Failed to load ' + ds.url + ' — ' + err.message; });
 }
 
-window._dbg = { camera, controls, openSheet, focusCategory, relatedNodes, nodeInComfortZone, get RAW(){ return RAW; }, get tween(){ return !!tween; }, get gesture(){ return twoFingerMode; },
+window._dbg = { camera, controls, openSheet, focusCategory, relatedNodes, nodeInComfortZone, get RAW(){ return RAW; }, get tween(){ return !!tween; }, get g2(){ return g2 && { ...g2, fingers: g2P.size }; }, set simVP(v){ simVP = v; },
   cat(key){ return RAW.cats.find(c => c.key === key || c.name === key); },
   get hiEdges(){ return hiLine ? hiLine.geometry.attributes.instanceStart.count : 0; },
   get opSpread(){ const o = nodeLabels.map(it=>it.mesh.material.opacity); return { min:+Math.min(...o).toFixed(2), max:+Math.max(...o).toFixed(2) }; },
