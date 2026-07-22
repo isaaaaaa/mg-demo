@@ -131,7 +131,9 @@
   #sheetHead .gwrap { display: flex; justify-content: center; padding: 3px 0 10px; }
   #sheetHead .gbar  { width: 42px; height: 4.5px; border-radius: 3px; background: rgba(120,120,126,.38); }
   #sheetBody {
-    flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    /* NOTE: no -webkit-overflow-scrolling:touch — legacy iOS scroller + transformed fixed ancestor
+       leaves the below-the-fold part of the body untouchable after sliding to full. */
+    flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain;
     padding: 4px min(22px, 5.5vw) calc(env(safe-area-inset-bottom) + 26px);
   }
   #sheet.open:not(.full) #sheetBody { touch-action: none; }   /* at half, body drags the SHEET — no native scroll race */
@@ -1118,6 +1120,17 @@ sheet.addEventListener('touchend', e => {
   else sheet.classList.toggle('full', best.act === 'full');
 });
 sheet.addEventListener('touchcancel', () => { if (sd){ sd = null; sheet.style.transition = ''; sheet.style.transform = ''; } });
+sheet.addEventListener('transitionend', e => {
+  // After the sheet slides to a new detent, force the scroller to rebuild — iOS otherwise keeps the
+  // OLD touch region for a scroller inside a transformed fixed ancestor, leaving the part of the
+  // body that used to be below the fold unresponsive after expanding to full.
+  if (e.target !== sheet || e.propertyName !== 'transform' || !sheetOpen) return;
+  const st = sheetBodyEl.scrollTop;
+  sheetBodyEl.style.overflowY = 'hidden';
+  void sheetBodyEl.offsetHeight;                 // reflow
+  sheetBodyEl.style.overflowY = '';
+  sheetBodyEl.scrollTop = st;
+});
 sheetHeadEl.addEventListener('click', e => {             // mouse path: click the bar/header to toggle
   if (!e.target.closest('.close')) sheet.classList.toggle('full');
 });
