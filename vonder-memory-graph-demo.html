@@ -530,6 +530,7 @@ function disposeGraph(){
   scene.remove(graphGroup);
   graphGroup = new THREE.Group(); scene.add(graphGroup);
   nodeMeshes = []; catMeshes = []; nodeLabels = []; catLabels = []; hiLine = null;
+  hiOld = []; hiBridge = null; hiPending = null; hiFadeIn = 0;   // highlight transition state dies with the old scene
   cullDirty = true;
 }
 
@@ -749,23 +750,76 @@ const tmp = new THREE.Vector3();
 const lineRes = new THREE.Vector2(innerWidth, innerHeight);
 
 // Selected node's edges → a brighter, thicker overlay drawn to each neighbour.
-function updateEdgeHighlight(){
-  if (hiLine){ graphGroup.remove(hiLine); hiLine.geometry.dispose(); hiLine.material.dispose(); hiLine = null; }
-  if (!selectedNode) return;
-  const pts = [];
-  RAW.edges.forEach(({a,b}) => { if (a === selectedNode || b === selectedNode) pts.push(a.pos.x,a.pos.y,a.pos.z, b.pos.x,b.pos.y,b.pos.z); });
-  if (!pts.length) return;
+// The highlight is SYNCED TO THE CAMERA: on a selection change the old node's lit edges fade OUT
+// while the camera flies (only the old↔new edge — the "bridge" — stays lit through the move), and
+// the new node's edges fade IN only once the camera has settled. Same from the unlit state: the
+// first tap lights nothing until the zoom-in lands, then the connections fade in.
+let hiFadeIn = 0;        // 0..1 lit level of hiLine (1 = fully lit)
+let hiPending = null;    // node whose edges light up at the next camera-settle
+let hiOld = [];          // previous highlights fading out: [{line, k}]
+let hiBridge = null;     // the old↔new edge kept lit through the transition
+function makeHiLine(pts, opacity){
   const g = new LineSegmentsGeometry(); g.setPositions(pts);
-  const m = new LineMaterial({ color: theme.lineHi, transparent: true, opacity: theme.lineHiOpacity, linewidth: 1.5 });
+  const m = new LineMaterial({ color: theme.lineHi, transparent: true, opacity, linewidth: 1.5 });
   m.resolution.copy(lineRes);
-  hiLine = new LineSegments2(g, m); hiLine.renderOrder = 2; graphGroup.add(hiLine);
+  const l = new LineSegments2(g, m); l.renderOrder = 2; graphGroup.add(l);
+  return l;
+}
+function dropHiLine(l){ if (l){ graphGroup.remove(l); l.geometry.dispose(); l.material.dispose(); } }
+function edgePts(n, excl){          // all of n's edges; excl = skip the edge shared with that node
+  const pts = [];
+  RAW.edges.forEach(({a,b}) => {
+    if ((a === n || b === n) && !(excl && (a === excl || b === excl)))
+      pts.push(a.pos.x,a.pos.y,a.pos.z, b.pos.x,b.pos.y,b.pos.z);
+  });
+  return pts;
+}
+function transitionEdgeHighlight(prev, next){
+  if (prev === next && hiLine) return;             // re-tap of the same node: leave it lit
+  if (hiBridge){ hiOld.push({ line: hiBridge, k: 1 }); hiBridge = null; }   // leftover of a rapid re-tap
+  if (hiLine){
+    const k0 = hiFadeIn;
+    dropHiLine(hiLine); hiLine = null;
+    if (prev && k0 > 0.01){
+      const pts = edgePts(prev, next);             // everything except the bridge edge
+      if (pts.length) hiOld.push({ line: makeHiLine(pts, k0 * theme.lineHiOpacity), k: k0 });
+      if (next){
+        const bp = [];
+        RAW.edges.forEach(({a,b}) => { if ((a===prev && b===next) || (a===next && b===prev))
+          bp.push(a.pos.x,a.pos.y,a.pos.z, b.pos.x,b.pos.y,b.pos.z); });
+        if (bp.length) hiBridge = makeHiLine(bp, k0 * theme.lineHiOpacity);
+      }
+    }
+  }
+  hiPending = next || null; hiFadeIn = 0;
+}
+// Per frame: advance both fades; the moment the camera is at rest, light the pending node's edges.
+function stepEdgeFade(){
+  if (hiPending && !tween){
+    const n = hiPending; hiPending = null;
+    if (n === selectedNode){
+      const pts = edgePts(n, null);
+      if (pts.length){ hiLine = makeHiLine(pts, 0); hiFadeIn = 1e-4; }
+    }
+  }
+  for (let i = hiOld.length - 1; i >= 0; i--){
+    const o = hiOld[i]; o.k -= 0.045;              // ≈0.37s fade-out, finishes during the flight
+    if (o.k <= 0){ dropHiLine(o.line); hiOld.splice(i, 1); }
+    else o.line.material.opacity = o.k * theme.lineHiOpacity;
+  }
+  if (hiLine && hiFadeIn < 1){
+    hiFadeIn = Math.min(1, hiFadeIn + 0.04);       // ≈0.42s fade-in, starts on arrival
+    hiLine.material.opacity = hiFadeIn * theme.lineHiOpacity;
+    if (hiFadeIn >= 1 && hiBridge){ dropHiLine(hiBridge); hiBridge = null; }   // bridge folds into the full set
+  }
 }
 // One entry point for selection: capsule ring + forced/non-occluded label + lit edges.
 function setSelected(node, cat){
+  const prevNode = selectedNode;
   selectedNode = node || null; selectedCat = cat || null; cullDirty = true;
   nodeLabels.forEach(it => it.el.classList.toggle('selected', it.node === selectedNode));
   catLabels.forEach(it => it.el.classList.toggle('selected', it.cat === selectedCat));
-  updateEdgeHighlight();
+  transitionEdgeHighlight(prevNode, selectedNode);
 }
 
 // Depth dim — nodes behind the focal plane fade toward the background; near/focal stay full.
@@ -794,6 +848,7 @@ function updateDepth(){
 function loop(){
   requestAnimationFrame(loop);
   stepTween();
+  stepEdgeFade();
   controls.autoRotate = autoRotate && !pointerDown && !sheetOpen && !tween;
   controls.update();
 
@@ -1307,7 +1362,10 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   labelRenderer.setSize(innerWidth, innerHeight);
-  lineRes.set(innerWidth, innerHeight); if (hiLine) hiLine.material.resolution.copy(lineRes);
+  lineRes.set(innerWidth, innerHeight);
+  if (hiLine) hiLine.material.resolution.copy(lineRes);
+  if (hiBridge) hiBridge.material.resolution.copy(lineRes);
+  hiOld.forEach(o => o.line.material.resolution.copy(lineRes));
   cullDirty = true;
 });
 
@@ -1347,8 +1405,10 @@ function loadDataset(key){
 window._dbg = { camera, controls, openSheet, openCategorySheet, focusCategory, relatedNodes, nodeInComfortZone, get RAW(){ return RAW; }, get tween(){ return !!tween; }, get g2(){ return g2 && { ...g2, fingers: g2P.size }; }, set simVP(v){ simVP = v; }, get sheetPos(){ return { open: sheetOpen, full: sheet.classList.contains('full'), ty: Math.round(sheetTy()) }; },
   cat(key){ return RAW.cats.find(c => c.key === key || c.name === key); },
   get hiEdges(){ return hiLine ? hiLine.geometry.attributes.instanceStart.count : 0; },
+  get hiState(){ return { pending: !!hiPending, fadeIn: +hiFadeIn.toFixed(2), old: hiOld.length, bridge: !!hiBridge,
+                          op: hiLine ? +hiLine.material.opacity.toFixed(2) : 0 }; },
   get opSpread(){ const o = nodeLabels.map(it=>it.mesh.material.opacity); return { min:+Math.min(...o).toFixed(2), max:+Math.max(...o).toFixed(2) }; },
-  frame(n){ for (let i=0;i<(n||60);i++){ stepTween(); controls.update(); renderer.render(scene,camera); labelRenderer.render(scene,camera); maybeCull(); updateDepth(); } } };   // TEMP test hook
+  frame(n){ for (let i=0;i<(n||60);i++){ stepTween(); stepEdgeFade(); controls.update(); renderer.render(scene,camera); labelRenderer.render(scene,camera); maybeCull(); updateDepth(); } } };   // TEMP test hook
 loadDataset(curDataset).then(() => loop());
 </script>
 </body>
