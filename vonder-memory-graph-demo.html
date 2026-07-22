@@ -114,19 +114,34 @@
     width: 100%; max-width: 460px; z-index: 30;
     background: var(--sheet); color: var(--ink);
     border-radius: 22px 22px 0 0;
-    padding: 22px min(22px, 5.5vw) calc(env(safe-area-inset-bottom) + 26px);   /* side padding scales down on very narrow phones */
     box-shadow: 0 -18px 50px rgba(0,0,0,.5);
     transition: transform .34s cubic-bezier(.22,1,.36,1);
-    height: 42vh; overflow-y: auto;   /* fixed expand height (between 1/3 and 1/2) — never covers the tapped node */
+    /* the element is always FULL-detent tall ("almost fullscreen"); the detents just slide it */
+    height: calc(100vh  - env(safe-area-inset-top) - 44px);
+    height: calc(100dvh - env(safe-area-inset-top) - 44px);
+    --sheet-half: 42vh;                    /* the default HALF detent — never covers the node parked at 1/3 */
+    display: flex; flex-direction: column; overflow: hidden; padding: 0;
   }
-  #sheet.open { transform: translate(-50%, 0); }
+  #sheet.open      { transform: translate(-50%, calc(100% - var(--sheet-half))); }   /* half: top 42vh visible */
+  #sheet.open.full { transform: translate(-50%, 0); }
+  #sheetHead {
+    flex: 0 0 auto; position: relative; padding: 6px min(22px, 5.5vw) 2px;
+    touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+  }
+  #sheetHead .gwrap { display: flex; justify-content: center; padding: 3px 0 10px; }
+  #sheetHead .gbar  { width: 42px; height: 4.5px; border-radius: 3px; background: rgba(120,120,126,.38); }
+  #sheetBody {
+    flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    padding: 4px min(22px, 5.5vw) calc(env(safe-area-inset-bottom) + 26px);
+  }
+  #sheet.open:not(.full) #sheetBody { touch-action: none; }   /* at half, body drags the SHEET — no native scroll race */
   #sheet .close {
-    position: absolute; top: 16px; right: 16px; width: 30px; height: 30px; border: 0; background: transparent;
+    position: absolute; top: 8px; right: 12px; width: 30px; height: 30px; border: 0; background: transparent;
     font-size: 22px; color: #555; cursor: pointer; line-height: 1;
   }
   #sheet h1 {
     font-family: Georgia, "Times New Roman", serif; font-weight: 600;
-    font-size: 23px; letter-spacing: .5px; text-transform: uppercase; margin: 2px 44px 22px 0; color: #1a1c22;
+    font-size: 23px; letter-spacing: .5px; text-transform: uppercase; margin: 0 44px 12px 0; color: #1a1c22;
     overflow-wrap: anywhere;
   }
   #sheet .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 22px; }
@@ -255,11 +270,14 @@
     <div id="hud"></div>
   </div>
 
-  <div id="hint">1 finger rotate · 2 fingers pan · pinch zoom · tap a node for details · tap a category to focus</div>
+  <div id="hint">1 finger rotate · 2 fingers pan · pinch zoom · tap a node or category for details</div>
 
   <div id="sheet">
-    <button class="close" id="sheetClose">×</button>
-    <h1 id="sTitle"></h1>
+    <div id="sheetHead">
+      <div class="gwrap"><div class="gbar"></div></div>
+      <button class="close" id="sheetClose">×</button>
+      <h1 id="sTitle"></h1>
+    </div>
     <div id="sheetBody"></div>
   </div>
 
@@ -1042,6 +1060,72 @@ renderer.domElement.addEventListener('pointerup', e => {
  * -------------------------------------------------------------------- */
 const sheet = document.getElementById('sheet');
 let sheetOpen = false;
+
+/* Sheet detents + drag. Opens at HALF (42vh). At half, a body drag moves the SHEET (up → full,
+ * down → dismiss) — content never scrolls at half. At FULL the body scrolls natively; once it is
+ * back at scrollTop 0, a further down-drag hands the gesture back to the sheet and collapses it
+ * (mid-gesture handoff included). The header strip is always a direct drag hotzone and a tap on
+ * it toggles half ↔ full. On release we snap to the detent nearest to position + ~160ms of fling. */
+const sheetBodyEl = document.getElementById('sheetBody');
+const sheetHeadEl = document.getElementById('sheetHead');
+const vpH = () => (simVP && simVP.h) || innerHeight;
+const sheetFullH = () => sheet.getBoundingClientRect().height || vpH() * 0.9;   // rect is 0 in the headless test pane
+const sheetHalfOff = () => Math.max(0, sheetFullH() - vpH() * 0.42);            // translateY of the half detent
+const sheetTy = () => { try { return new DOMMatrixReadOnly(getComputedStyle(sheet).transform).m42; } catch { return 0; } };
+let sd = null;   // active drag: {y0, ty0, mode: null|'sheet'|'scroll', lastY, lastT, v, fromHead, moved}
+sheet.addEventListener('touchstart', e => {
+  if (!sheetOpen || e.touches.length !== 1){ sd = null; return; }
+  const t = e.touches[0];
+  sd = { y0: t.clientY, ty0: 0, mode: null, lastY: t.clientY, lastT: performance.now(), v: 0,
+         fromHead: !!(e.target.closest && e.target.closest('#sheetHead')), moved: 0 };
+}, {passive: true});
+sheet.addEventListener('touchmove', e => {
+  if (!sd || e.touches.length !== 1) return;
+  const y = e.touches[0].clientY, dy = y - sd.y0;
+  sd.moved = Math.max(sd.moved, Math.abs(dy));
+  const now = performance.now();
+  if (now > sd.lastT) sd.v = 0.6*sd.v + 0.4*((y - sd.lastY) / (now - sd.lastT));   // px/ms, smoothed
+  const goingDown = y > sd.lastY;
+  sd.lastY = y; sd.lastT = now;
+  if (!sd.mode){
+    const full = sheet.classList.contains('full');
+    if (sd.fromHead || !full || (sheetBodyEl.scrollTop <= 0 && dy > 0)) sd.mode = 'sheet';
+    else sd.mode = 'scroll';
+    if (sd.mode === 'sheet'){ sd.ty0 = sheetTy(); sd.y0 = y; sheet.style.transition = 'none'; }
+  } else if (sd.mode === 'scroll' && goingDown && sheetBodyEl.scrollTop <= 0){
+    sd.mode = 'sheet'; sd.ty0 = sheetTy(); sd.y0 = y; sheet.style.transition = 'none';   // scroll → sheet handoff
+  }
+  if (sd.mode === 'sheet'){
+    if (!sd.fromHead) e.preventDefault();               // we own the gesture — block native scroll
+    sheet.style.transform = `translate(-50%, ${Math.max(0, sd.ty0 + (y - sd.y0))}px)`;
+  }
+}, {passive: false});
+sheet.addEventListener('touchend', e => {
+  if (!sd) return;
+  const { mode, v, moved, fromHead } = sd; sd = null;
+  const curTy = sheetTy();                               // read BEFORE clearing the inline transform
+  sheet.style.transition = '';
+  if (moved < 8 && fromHead && !(e.target.closest && e.target.closest('.close'))){
+    e.preventDefault();                                  // suppress the synthetic click (mouse path has its own)
+    sheet.style.transform = ''; sheet.classList.toggle('full'); return;
+  }
+  if (mode !== 'sheet'){ return; }
+  const proj = curTy + v * 160;                          // position + a little fling
+  const cands = [ {off: 0, act: 'full'}, {off: sheetHalfOff(), act: 'half'}, {off: sheetFullH() * 1.05, act: 'close'} ];
+  let best = cands[0]; for (const c of cands) if (Math.abs(proj - c.off) < Math.abs(proj - best.off)) best = c;
+  sheet.style.transform = '';                            // hand back to the class-driven transform (it animates)
+  if (best.act === 'close') closeSheet();
+  else sheet.classList.toggle('full', best.act === 'full');
+});
+sheet.addEventListener('touchcancel', () => { if (sd){ sd = null; sheet.style.transition = ''; sheet.style.transform = ''; } });
+sheetHeadEl.addEventListener('click', e => {             // mouse path: click the bar/header to toggle
+  if (!e.target.closest('.close')) sheet.classList.toggle('full');
+});
+// every open lands at the HALF detent with the content scrolled to the top
+function presentSheet(){
+  sheet.classList.remove('full'); sheet.style.transform = '';
+  sheet.classList.add('open'); sheetOpen = true; sheetBodyEl.scrollTop = 0;
+}
 function relatedNodes(n){
   const out = [], seen = new Set();
   RAW.edges.forEach(e => {
@@ -1079,7 +1163,7 @@ function openSheet(n){
   body.append(secttlEl('Summary'));
   const sum = elm('div','summary'); sum.textContent = n.summary || '—'; body.append(sum);
 
-  sheet.classList.add('open'); sheetOpen = true;
+  presentSheet();
   locate(n.pos, nodeFocusDist(), 1/3);   // always zoom to a consistent distance, node parked at the upper third
 }
 
@@ -1106,10 +1190,10 @@ function openCategorySheet(cat){
   });
   body.append(list);
 
-  sheet.classList.add('open'); sheetOpen = true;
+  presentSheet();
   locate(cat.pos, clusterFitDistance(), 1/3);   // whole cluster visible above the sheet, parked at the upper third
 }
-function closeSheet(){ sheet.classList.remove('open'); sheetOpen=false; }   // selection (ring + lit edges) persists; cleared on zoom-out
+function closeSheet(){ sheet.classList.remove('open','full'); sheet.style.transform=''; sheetOpen=false; }   // selection (ring + lit edges) persists; cleared on zoom-out
 document.getElementById('sheetClose').addEventListener('click', closeSheet);
 
 /* ----------------------------------------------------------------------
@@ -1244,7 +1328,7 @@ function loadDataset(key){
     .catch(err => { ld.style.display = 'flex'; ld.textContent = 'Failed to load ' + ds.url + ' — ' + err.message; });
 }
 
-window._dbg = { camera, controls, openSheet, openCategorySheet, focusCategory, relatedNodes, nodeInComfortZone, get RAW(){ return RAW; }, get tween(){ return !!tween; }, get g2(){ return g2 && { ...g2, fingers: g2P.size }; }, set simVP(v){ simVP = v; },
+window._dbg = { camera, controls, openSheet, openCategorySheet, focusCategory, relatedNodes, nodeInComfortZone, get RAW(){ return RAW; }, get tween(){ return !!tween; }, get g2(){ return g2 && { ...g2, fingers: g2P.size }; }, set simVP(v){ simVP = v; }, get sheetPos(){ return { open: sheetOpen, full: sheet.classList.contains('full'), ty: Math.round(sheetTy()) }; },
   cat(key){ return RAW.cats.find(c => c.key === key || c.name === key); },
   get hiEdges(){ return hiLine ? hiLine.geometry.attributes.instanceStart.count : 0; },
   get opSpread(){ const o = nodeLabels.map(it=>it.mesh.material.opacity); return { min:+Math.min(...o).toFixed(2), max:+Math.max(...o).toFixed(2) }; },
