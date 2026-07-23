@@ -46,8 +46,8 @@
 
   /* Figma black */
   html.theme-dark, body.theme-dark { background: #0f0f0f; }
-  body.theme-dark .cap.node { color:rgba(255,255,255,.92); background:rgba(15,15,15,.72); border:1px solid rgba(255,255,255,.16); }
-  body.theme-dark .cap.cat  { color:#fff; background:rgba(255,255,255,.10); border:1px solid transparent; }
+  body.theme-dark .cap.node { color:rgba(255,255,255,.92); background:#292929; border:1px solid rgba(255,255,255,.18); }
+  body.theme-dark .cap.cat  { color:#fff; background:#292929; border:1px solid rgba(255,255,255,.18); }
   body.theme-dark .cap.selected { border-color: rgba(255,255,255,.65); background: rgba(15,15,15,.9); }
   /* paper light (#EFEEE9) */
   html.theme-light, body.theme-light { background: #efeee9; }
@@ -74,30 +74,6 @@
   #datasetTabs button.on { background: var(--accent); color: #fff; }
   #panel.hidden { transform: translateY(-102%); }
   .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .seg { display: flex; background: rgba(255,255,255,.06); border-radius: 11px; padding: 3px; gap: 2px; }
-  .seg button {
-    border: 0; background: transparent; color: #aeb1c0;
-    font-size: 12px; font-weight: 600; padding: 7px 10px; border-radius: 9px;
-    cursor: pointer; font-family: inherit; white-space: nowrap;
-  }
-  .seg button.on { background: var(--accent); color: #fff; }
-  .sliders { margin-top: 9px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
-  .sl { display: flex; flex-direction: column; gap: 3px; }
-  .sl label { font-size: 10.5px; letter-spacing: .4px; text-transform: uppercase; color: #8d90a0; display: flex; justify-content: space-between; }
-  .sl label b { color: #d8d9e2; font-weight: 600; }
-  input[type=range] { width: 100%; accent-color: var(--accent); height: 22px; }
-  .toggles { margin-top: 9px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .chip {
-    font-size: 11.5px; color: #c9cbd6; background: rgba(255,255,255,.06);
-    border: 1px solid rgba(255,255,255,.08); border-radius: 9px; padding: 6px 10px; cursor: pointer; user-select: none;
-  }
-  .chip.on { background: rgba(176,107,255,.22); border-color: rgba(176,107,255,.6); color: #fff; }
-
-  #hud {
-    margin-top: 9px; font-size: 11px; color: #8e91a2; line-height: 1.5;
-    font-variant-numeric: tabular-nums;
-  }
-  #hud b { color: #cfd1dc; font-weight: 600; }
 
   /* ---- top bar (Figma: centred uppercase title + search at right; double-tap title = console) ---- */
   #topbar {
@@ -141,7 +117,7 @@
     touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
   }
   #sheetHead .gwrap { display: flex; justify-content: center; padding: 6px 0 14px; }
-  #sheetHead .gbar  { width: 120px; height: 5px; border-radius: 3px; background: #17181a; }   /* Figma: wide dark bar */
+  #sheetHead .gbar  { width: 120px; height: 5px; border-radius: 3px; background: #0f0f0f; }   /* Figma: wide dark bar */
   #sheetBody {
     /* NOTE: no -webkit-overflow-scrolling:touch — legacy iOS scroller + transformed fixed ancestor
        leaves the below-the-fold part of the body untouchable after sliding to full. */
@@ -149,27 +125,23 @@
     padding: 4px min(22px, 5.5vw) calc(env(safe-area-inset-bottom) + 26px);
   }
   #sheet.open:not(.full) #sheetBody { touch-action: none; }   /* at half, body drags the SHEET — no native scroll race */
-  #sheet .close {
-    position: absolute; top: 8px; right: 12px; width: 30px; height: 30px; border: 0; background: transparent;
-    font-size: 22px; color: #555; cursor: pointer; line-height: 1;
-  }
   #sheet h1 {
     /* Figma: centred serif title in the node's ORIGINAL casing (only categories force uppercase) */
     font-family: Georgia, "Times New Roman", serif; font-weight: 600;
-    font-size: 26px; letter-spacing: .2px; text-align: center; margin: 0 44px 16px; color: #17181a;
+    font-size: 26px; letter-spacing: .2px; text-align: center; margin: 0 24px 16px; color: #0f0f0f;
     overflow-wrap: anywhere;
   }
   #sheet h1.catz { text-transform: uppercase; }
   #sheet .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 22px; }
   #sheet .mpill { font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px; display: flex; align-items: center; gap: 6px; background: #e7e4dd; color: #3a3c42; }
   #sheet .mpill .swatch { width: 8px; height: 8px; border-radius: 50%; }
-  #sheet .secttl { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #6d6a63; margin: 0 0 12px; }
+  #sheet .secttl { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #0f0f0f; margin: 0 0 12px; }
   /* Figma: SUMMARY body is the serif reading face */
-  #sheet .summary { font-family: Georgia, "Times New Roman", serif; font-size: 15.5px; color: #1d1c19; line-height: 1.62; white-space: pre-wrap; margin-bottom: 22px; }
+  #sheet .summary { font-family: Georgia, "Times New Roman", serif; font-size: 16px; color: #71706e; line-height: 1.28; white-space: pre-wrap; margin-bottom: 22px; }
   #sheet .rel { margin-top: 2px; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
   /* Figma: RELATED pills are white capsules; the node name keeps its original casing */
-  #sheet .rel .pill { font-size: 12.5px; font-weight: 500; background: #fff; color: #17181a; padding: 9px 15px;
-    border: 1px solid rgba(0,0,0,.05); box-shadow: 0 1px 2px rgba(20,18,12,.05); border-radius: 999px;
+  #sheet .rel .pill { font-size: 13px; font-weight: 500; background: #f9f8f6; color: #2c2c2c; padding: 9px 15px;
+    border: 1px solid rgba(0,0,0,.04); box-shadow: 0 1px 2px rgba(20,18,12,.05); border-radius: 999px;
     max-width: 100%; overflow-wrap: anywhere; }
   #sheet .rel .rpill { cursor: pointer; }
   #sheet .rel .rpill:active { background: #eceae3; }
@@ -183,53 +155,57 @@
     border-top: 1px solid rgba(0,0,0,.07);
   }
   #sheet .noderow:active { background: rgba(0,0,0,.04); }
-  #sheet .noderow .rdot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; background: #c9c5ba; }   /* neutral — graph no longer colour-codes */
-  #sheet .noderow .rname { flex: 1; font-size: 14px; color: #24262d; line-height: 1.35; overflow-wrap: anywhere; }
-  #sheet .noderow .rdeg { font-size: 11.5px; color: #9a9ca3; font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; }
-  #sheet .listhdr { display:flex; justify-content:space-between; align-items:baseline; font-size:11px; letter-spacing:.8px; text-transform:uppercase; color:#6f717a; margin:0 0 6px; }
-  #sheet .listhdr .hr { color:#9a9ca3; }
+  #sheet .noderow .rname { flex: 1; font-size: 15px; color: #0f0f0f; line-height: 1.35; overflow-wrap: anywhere; }
+  #sheet .noderow .rdeg { font-size: 12px; color: rgba(15,15,15,.4); font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; }
+  #sheet .listhdr { display:flex; justify-content:space-between; align-items:baseline; font-size:11px; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:#0f0f0f; margin:0 0 6px; }
+  #sheet .listhdr .hr { color:rgba(15,15,15,.4); }
 
   /* light theme — keep the chrome light too so the whole background reads light */
   body.theme-light #panel { background: linear-gradient(180deg, rgba(239,238,233,.96), rgba(239,238,233,0)); }
   body.theme-light #datasetTabs { background: rgba(40,38,32,.06); border-color: rgba(40,38,32,.14); }
   body.theme-light #datasetTabs button { color:#8a857a; }
   body.theme-light #datasetTabs button.on { color:#fff; }
-  body.theme-light .chip { background: rgba(40,38,32,.06); border-color: rgba(40,38,32,.12); color:#5a564e; }
-  body.theme-light .chip.on { background: rgba(125,138,168,.25); border-color: rgba(125,138,168,.6); color:#33373f; }
-  body.theme-light .seg { background: rgba(40,38,32,.06); }
-  body.theme-light .seg button { color:#8a857a; }
-  body.theme-light #hud, body.theme-light #hud b { color:#6f6a5f; }
-  body.theme-light .sl label { color:#8a857a; }
-  body.theme-light .sl label b { color:#4a4640; }
 
-  /* search overlay */
-  #search { position: fixed; inset: 0; z-index: 50; display: none; flex-direction: column; padding: calc(env(safe-area-inset-top) + 12px) 14px 0; }
+  /* search — Figma Action-Search screens (dark full-screen takeover; keyboard UI is the OS's) */
+  #search { position: fixed; inset: 0; z-index: 50; display: none; flex-direction: column;
+    padding: calc(env(safe-area-inset-top) + 10px) 20px 0; background: #0f0f0f; }
   #search.open { display: flex; }
-  body.theme-dark  #search { background: rgba(10,11,14,.97); }
-  body.theme-light #search { background: rgba(244,243,239,.98); }
-  #search .srow { display: flex; gap: 8px; align-items: center; }
-  #search input {
-    flex: 1; font-size: 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid; font-family: inherit; outline: none;
-  }
-  body.theme-dark  #search input { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); color: #e9eaf0; }
-  body.theme-light #search input { background: #fff; border-color: rgba(40,38,32,.16); color: #26282d; }
-  #search .scancel { border: 0; background: transparent; font-family: inherit; font-size: 14px; cursor: pointer; padding: 8px 6px; }
-  body.theme-dark  #search .scancel { color: #9aa0b5; }
-  body.theme-light #search .scancel { color: #8a857a; }
-  #searchResults { margin-top: 6px; overflow-y: auto; flex: 1; }
-  #search .sres { display: flex; align-items: center; gap: 10px; padding: 12px 4px; cursor: pointer; border-bottom: 1px solid; }
-  body.theme-dark  #search .sres { border-color: rgba(255,255,255,.06); }
-  body.theme-light #search .sres { border-color: rgba(40,38,32,.08); }
-  #search .sres .rdot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-  body.theme-dark  #search .sres .rdot { background: rgba(255,255,255,.5); }
-  body.theme-light #search .sres .rdot { background: rgba(23,24,26,.35); }
-  #search .sres .rname { flex: 1; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  body.theme-dark  #search .sres .rname { color: #e3e1da; }
-  body.theme-light #search .sres .rname { color: #2a2c33; }
-  #search .sres .rcat { font-size: 11.5px; opacity: .65; white-space: nowrap; }
-  body.theme-dark  #search .sres .rcat { color: #9aa0b5; }
-  body.theme-light #search .sres .rcat { color: #8a857a; }
-  #search .sempty { padding: 18px 4px; font-size: 13px; opacity: .5; }
+  #search .srow { display: flex; gap: 4px; align-items: center; flex: 0 0 auto; }
+  #searchBack { width: 40px; height: 44px; border: 0; background: transparent; color: #fff; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: -10px; }
+  #search .sfield { position: relative; flex: 1; }
+  #search input { width: 100%; height: 44px; font-size: 15px; padding: 0 46px 0 18px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.04); color: #fff;
+    font-family: inherit; outline: none; }
+  #search input::placeholder { color: rgba(255,255,255,.4); }
+  #search .sglass { position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+    color: rgba(255,255,255,.8); pointer-events: none; }
+  #searchClear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 36px; height: 36px; border: 0; background: transparent; color: rgba(255,255,255,.8);
+    display: none; align-items: center; justify-content: center; cursor: pointer; }
+  #search.typing .sglass { display: none; }
+  #search.typing #searchClear { display: flex; }
+  #searchBody { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+  #search .sres { display: flex; align-items: baseline; gap: 12px; padding: 17px 2px; cursor: pointer;
+    border-bottom: 1px solid rgba(255,255,255,.08); }
+  #search .sres .rname { flex: 1; font-size: 15px; font-weight: 400; color: #fff;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #search .sres .rname b { font-weight: 700; }
+  #search .sres .rcat { font-size: 10.5px; letter-spacing: .6px; text-transform: uppercase;
+    color: rgba(255,255,255,.5); white-space: nowrap; }
+  /* empty ("Find a Memory") + no-results states */
+  #searchEmpty, #searchNone { display: none; flex-direction: column; align-items: center; text-align: center; padding-top: 13vh; }
+  #search.stateEmpty #searchEmpty { display: flex; }
+  #search.stateNone  #searchNone  { display: flex; }
+  #search .neb { width: 210px; height: 126px; }
+  #search .neb.small { width: 150px; height: 90px; }
+  #search .neb svg { width: 100%; height: 100%; }
+  #searchEmpty h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: 26px; color: #fff; margin: 28px 0 12px; }
+  #searchEmpty p { font-size: 13px; color: rgba(255,255,255,.55); line-height: 1.55; margin: 0; }
+  #searchNone p { font-family: Georgia, "Times New Roman", serif; font-size: 14.5px; color: rgba(255,255,255,.6); line-height: 1.6; margin: 24px 0 0; }
+  #searchNone .askv { margin-top: 44px; width: 100%; max-width: 360px; height: 52px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.05); color: #fff;
+    font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; cursor: pointer; }
 
   #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #6a6d80; font-size: 13px; z-index: 40; pointer-events: none; }
 </style>
@@ -247,42 +223,41 @@
 
   <div id="search">
     <div class="srow">
-      <input id="searchInput" type="text" placeholder="Search nodes…" autocomplete="off" autocapitalize="off" spellcheck="false" />
-      <button class="scancel" id="searchCancel">Cancel</button>
+      <button id="searchBack" aria-label="Back">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </button>
+      <div class="sfield">
+        <input id="searchInput" type="text" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false" />
+        <svg class="sglass" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+        <button id="searchClear" aria-label="Clear">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
     </div>
-    <div id="searchResults"></div>
+    <div id="searchBody">
+      <div id="searchResults"></div>
+      <div id="searchEmpty">
+        <div class="neb"></div>
+        <h2>Find a Memory</h2>
+        <p>Search for specific memories by<br/>keywords or categories.</p>
+      </div>
+      <div id="searchNone">
+        <div class="neb small"></div>
+        <p>Sorry, no stories were found.<br/>Please search again or chat with<br/>VONDER for further assistance.</p>
+        <button class="askv">ASK VONDER</button>
+      </div>
+    </div>
   </div>
 
   <div id="panel" class="hidden">
     <div class="row">
       <div id="datasetTabs"></div>
     </div>
-    <div class="sliders">
-      <div class="sl">
-        <label>Initial zoom (fit) <b id="fitVal">0.50×</b></label>
-        <input type="range" id="fit" min="0.4" max="2.6" step="0.05" value="0.5" />
-      </div>
-      <div class="sl">
-        <label>Spread (spacing) <b id="spreadVal">1.0×</b></label>
-        <input type="range" id="spread" min="0.6" max="2.0" step="0.05" value="1.0" />
-      </div>
-    </div>
-    <div class="toggles">
-      <div class="chip on" id="lod">Prevent overlap</div>
-      <div class="chip on" id="rot">Auto-rotate</div>
-      <div class="chip" id="refit">Re-fit view</div>
-      <div class="seg" id="themeSeg" style="margin-left:auto">
-        <button data-th="dark" class="on">Dark</button>
-        <button data-th="light">Light</button>
-      </div>
-    </div>
-    <div id="hud"></div>
   </div>
 
   <div id="sheet">
     <div id="sheetHead">
       <div class="gwrap"><div class="gbar"></div></div>
-      <button class="close" id="sheetClose">×</button>
       <h1 id="sTitle"></h1>
     </div>
     <div id="sheetBody"></div>
@@ -753,7 +728,7 @@ function focusCategory(cat){
   startTween(dest, cat.pos.clone());
 
   setSelected(null, cat);   // force the focused category's capsule visible & non-occluded
-  autoRotate = false; document.getElementById('rot').classList.remove('on');  // stop spin while reading
+  autoRotate = false;   // stop spin while reading
 }
 
 // Step back up to the whole-graph overview (also the Re-fit action).
@@ -761,7 +736,7 @@ function unfocusToOverview(){
   closeSheet();
   setSelected(null, null);                       // leaving for the overview drops the selection
   applyZoomRangeAndFit(curFit, true);            // tween out + restore normal zoom range
-  autoRotate = true; document.getElementById('rot').classList.add('on');
+  autoRotate = true;
 }
 
 // Bring a point to the screen. frac=0 → centre (default); frac=1/3 → upper third
@@ -777,7 +752,7 @@ function locate(pos, dist, frac){
     tgt.addScaledVector(up, -d * Math.tan(camera.fov*Math.PI/360) * frac);
   }
   startTween(tgt.clone().addScaledVector(off, d), tgt);
-  autoRotate = false; document.getElementById('rot').classList.remove('on');
+  autoRotate = false;
 }
 
 // Is the node already comfortably visible (on-screen, in the upper ~half the sheet won't cover)?
@@ -903,7 +878,6 @@ function loop(){
 
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
-  updateHud();
 }
 
 /* ----------------------------------------------------------------------
@@ -1300,10 +1274,9 @@ function openCategorySheet(cat){
   const list = elm('div','nodelist');
   cat.nodes.slice().sort((a,b) => (b.degree||0) - (a.degree||0)).forEach(nd => {
     const row = elm('div','noderow');
-    const dot = elm('span','rdot');
     const nm = elm('span','rname'); nm.textContent = nd.name;
     const dg = elm('span','rdeg'); dg.textContent = nd.degree != null ? nd.degree : '';
-    row.append(dot, nm, dg);
+    row.append(nm, dg);
     row.addEventListener('click', () => openSheet(nd));
     list.append(row);
   });
@@ -1313,22 +1286,14 @@ function openCategorySheet(cat){
   locate(cat.pos, clusterFitDistance(), 1/3);   // whole cluster visible above the sheet, parked at the upper third
 }
 function closeSheet(){ sheet.classList.remove('open','full'); sheet.style.transform=''; sheetOpen=false; }   // selection (ring + lit edges) persists; cleared on zoom-out
-document.getElementById('sheetClose').addEventListener('click', closeSheet);
 
 /* ----------------------------------------------------------------------
  * 11. UI wiring
  * -------------------------------------------------------------------- */
-let curSpread = 1.0, curFit = 0.5, autoRotate = true;
+const curSpread = 1.0, curFit = 0.5;   // fixed: spread 1.0×, initial zoom 0.5× (dev knobs removed)
+let autoRotate = true;                 // fixed ON at overview (still pauses while reading/focusing)
 
 // the old preset row now holds a category legend, filled once data loads
-const fitEl = document.getElementById('fit'), spreadEl = document.getElementById('spread');
-fitEl.addEventListener('input', () => { curFit = +fitEl.value; document.getElementById('fitVal').textContent = curFit.toFixed(2)+'×'; applyZoomRangeAndFit(curFit, true); });
-spreadEl.addEventListener('input', () => { curSpread = +spreadEl.value; document.getElementById('spreadVal').textContent = curSpread.toFixed(2)+'×'; });
-spreadEl.addEventListener('change', () => rebuild(true));
-
-document.getElementById('lod').addEventListener('click', e => { cullEnabled = !cullEnabled; cullDirty = true; e.target.classList.toggle('on', cullEnabled); });
-document.getElementById('rot').addEventListener('click', e => { autoRotate = !autoRotate; e.target.classList.toggle('on', autoRotate); });
-document.getElementById('refit').addEventListener('click', () => unfocusToOverview());
 // dev console lives behind a DOUBLE-TAP on the top-bar title (no visible chrome for it)
 { let tbT = 0;
   document.getElementById('tbTitle').addEventListener('click', () => {
@@ -1338,16 +1303,6 @@ document.getElementById('refit').addEventListener('click', () => unfocusToOvervi
   });
 }
 
-document.querySelectorAll('#themeSeg button').forEach(b => b.addEventListener('click', () => {
-  if (b.classList.contains('on')) return;
-  themeKey = b.dataset.th; theme = THEMES[themeKey];
-  document.documentElement.className = 'theme-' + themeKey;
-  document.body.className = 'theme-' + themeKey;
-  document.getElementById('themeColor').setAttribute('content', themeKey === 'light' ? '#efeee9' : '#0f0f0f');
-  document.querySelectorAll('#themeSeg button').forEach(x => x.classList.toggle('on', x === b));
-  if (lastRaw){ RAW = parseSource(lastRaw); rebuild(false); }
-}));
-
 /* ---- search (top-left) → centre the chosen node ---- */
 const searchEl = document.getElementById('search');
 function openSearch(){ searchEl.classList.add('open'); const i = document.getElementById('searchInput'); i.value=''; renderSearch(''); setTimeout(()=>i.focus(), 60); }
@@ -1355,34 +1310,48 @@ function closeSearch(){ searchEl.classList.remove('open'); }
 function renderSearch(q){
   const res = document.getElementById('searchResults'); res.innerHTML = '';
   if (!RAW) return;
-  q = q.trim().toLowerCase();
-  let list = q ? RAW.allNodes.filter(n => (n.name||'').toLowerCase().includes(q)) : RAW.allNodes;
-  list = list.slice().sort((a,b) => (b.degree||0) - (a.degree||0)).slice(0, 60);
-  if (!list.length){ const e = elm('div','sempty'); e.textContent = q ? 'No matches' : ''; res.append(e); return; }
+  q = q.trim();
+  searchEl.classList.toggle('typing', q.length > 0);
+  searchEl.classList.remove('stateEmpty', 'stateNone');
+  if (!q){ searchEl.classList.add('stateEmpty'); return; }           // Figma: "Find a Memory" landing
+  const ql = q.toLowerCase();
+  const list = RAW.allNodes.filter(n => (n.name||'').toLowerCase().includes(ql))
+    .sort((a,b) => (b.degree||0) - (a.degree||0)).slice(0, 60);
+  if (!list.length){ searchEl.classList.add('stateNone'); return; }  // Figma: sorry + ASK VONDER
   list.forEach(n => {
     const row = elm('div','sres');
-    const dot = elm('span','rdot');
-    const nm = elm('span','rname'); nm.textContent = n.name;
+    const nm = elm('span','rname');
+    const i = (n.name||'').toLowerCase().indexOf(ql);
+    if (i >= 0){                                                     // matched substring in bold
+      nm.append(document.createTextNode(n.name.slice(0, i)));
+      const b = document.createElement('b'); b.textContent = n.name.slice(i, i + q.length); nm.append(b);
+      nm.append(document.createTextNode(n.name.slice(i + q.length)));
+    } else nm.textContent = n.name;
     const ct = elm('span','rcat'); ct.textContent = n._catKey ? catLabel(n._catKey) : (n.catName || '');
-    row.append(dot, nm, ct);
-    row.addEventListener('click', () => { closeSearch(); openSheet(n); });   // open its detail + zoom in
+    row.append(nm, ct);
+    row.addEventListener('click', () => { closeSearch(); openSheet(n); });
     res.append(row);
   });
 }
 document.getElementById('searchBtn').addEventListener('click', openSearch);
-document.getElementById('searchCancel').addEventListener('click', closeSearch);
+document.getElementById('searchBack').addEventListener('click', closeSearch);
+document.getElementById('searchClear').addEventListener('click', () => {
+  const i = document.getElementById('searchInput'); i.value = ''; renderSearch(''); i.focus();
+});
 document.getElementById('searchInput').addEventListener('input', e => renderSearch(e.target.value));
+// procedural stand-in for the Figma dotted-nebula illustration (tilted elliptical dot swirl)
+document.querySelectorAll('#search .neb').forEach(el => {
+  let dots = '';
+  for (let i = 0; i < 170; i++){
+    const t = Math.random() * Math.PI * 2;
+    const r = 0.34 + 0.66 * Math.pow(Math.random(), 0.6);            // annulus — sparse dark core
+    const x = 100 + Math.cos(t) * 92 * r, y = 60 + Math.sin(t) * 34 * r + Math.cos(t * 2) * 4;
+    const rad = (Math.random() * 1.05 + 0.35) * (1.15 - r * 0.5);
+    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(2)}" opacity="${(0.25 + Math.random() * 0.65).toFixed(2)}"/>`;
+  }
+  el.innerHTML = `<svg viewBox="0 0 200 120" fill="#fff" style="transform:rotate(-14deg)">${dots}</svg>`;
+});
 
-const hud = document.getElementById('hud');
-function updateHud(){
-  if (!currentData) return;
-  const d = camera.position.distanceTo(controls.target);
-  const zoomPct = Math.round((window._fitDist / d) * 100);
-  const tier = curTier <= 0.05 ? 'Overview' : `Detail ${Math.round(curTier*100)}%`;
-  hud.innerHTML =
-    `group <b>${RAW.groupId || '—'}</b> · categories <b>${currentData.cats.length}</b> · nodes <b>${currentData.allNodes.length}</b> · edges <b>${currentData.relLinks.length}</b><br>` +
-    `tier <b>${tier}</b> · capsules <b>${visibleCaps}</b>/${currentData.allNodes.length + currentData.cats.length} · zoom <b>${zoomPct}%</b> · range <b>${Math.round(controls.minDistance)}–${Math.round(controls.maxDistance)}</b>`;
-}
 
 
 function rebuild(animate){
