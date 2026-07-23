@@ -101,8 +101,7 @@
     position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; transform: translateY(110%);
     width: 100%; max-width: 460px; z-index: 30;
     background: var(--sheet); color: var(--ink);
-    border-radius: 22px 22px 0 0;
-    box-shadow: 0 -18px 50px rgba(0,0,0,.5);
+    border-radius: 44px 44px 0 0;   /* measured off the Figma sheet corner */
     transition: transform .34s cubic-bezier(.22,1,.36,1);
     /* the element is always FULL-detent tall ("almost fullscreen"); the detents just slide it */
     height: calc(100vh  - env(safe-area-inset-top) - 44px);
@@ -113,39 +112,39 @@
   #sheet.open      { transform: translateY(calc(100% - var(--sheet-half))); }   /* half: top 42vh visible */
   #sheet.open.full { transform: none; }                                         /* full: NO transform at rest */
   #sheetHead {
-    flex: 0 0 auto; position: relative; padding: 6px min(22px, 5.5vw) 2px;
+    flex: 0 0 auto; position: relative; padding: 0 min(20px, 5vw) 2px;
     touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
   }
-  #sheetHead .gwrap { display: flex; justify-content: center; padding: 6px 0 14px; }
-  #sheetHead .gbar  { width: 120px; height: 5px; border-radius: 3px; background: #0f0f0f; }   /* Figma: wide dark bar */
+  #sheetHead .gwrap { display: flex; justify-content: center; padding: 12px 0 0; }
+  #sheetHead .gbar  { width: 144px; height: 5px; border-radius: 3px; background: #0f0f0f; }   /* measured: 144×5, 12px below the edge */
   #sheetBody {
     /* NOTE: no -webkit-overflow-scrolling:touch — legacy iOS scroller + transformed fixed ancestor
        leaves the below-the-fold part of the body untouchable after sliding to full. */
     flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain;
-    padding: 4px min(22px, 5.5vw) calc(env(safe-area-inset-bottom) + 26px);
+    padding: 4px min(20px, 5vw) calc(env(safe-area-inset-bottom) + 26px);
   }
   #sheet.open:not(.full) #sheetBody { touch-action: none; }   /* at half, body drags the SHEET — no native scroll race */
   #sheet h1 {
     /* Figma: centred serif title in the node's ORIGINAL casing (only categories force uppercase) */
     font-family: Georgia, "Times New Roman", serif; font-weight: 600;
-    font-size: 26px; letter-spacing: .2px; text-align: center; margin: 0 24px 16px; color: #0f0f0f;
+    font-size: 26px; letter-spacing: .2px; text-align: center; margin: 29px 4px 28px; color: #0f0f0f;
     overflow-wrap: anywhere;
   }
   /* category sheet: sans count title + uppercase category subtitle (Figma "25 memories / ORGANIZATION") */
   #sheet h1.cnt { font-family: inherit; font-weight: 600; font-size: 26px; letter-spacing: -.3px; margin-bottom: 6px; }
   #sSub { display: none; text-align: center; font-size: 12px; font-weight: 600; letter-spacing: 1px;
-    text-transform: uppercase; color: #696866; margin: 0 24px 14px; }
+    text-transform: uppercase; color: #696866; margin: -20px 4px 24px; }   /* tucks under the count title */
   #sSub.show { display: block; }
   #sheet .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 22px; }
   #sheet .mpill { font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px; display: flex; align-items: center; gap: 6px; background: #e7e4dd; color: #3a3c42; }
   #sheet .mpill .swatch { width: 8px; height: 8px; border-radius: 50%; }
-  #sheet .secttl { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #0f0f0f; margin: 0 0 12px; }
+  #sheet .secttl { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #0f0f0f; margin: 0 0 18px; }
   /* Figma: SUMMARY body is the serif reading face */
   #sheet .summary { font-family: Georgia, "Times New Roman", serif; font-size: 16px; color: #71706e; line-height: 1.28; white-space: pre-wrap; margin-bottom: 22px; }
-  #sheet .rel { margin-top: 2px; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
-  /* Figma: RELATED pills are white capsules; the node name keeps its original casing */
-  #sheet .rel .pill { font-size: 13px; font-weight: 500; background: #f9f8f6; color: #2c2c2c; padding: 9px 15px;
-    border: 1px solid rgba(0,0,0,.04); box-shadow: 0 1px 2px rgba(20,18,12,.05); border-radius: 999px;
+  #sheet .rel { margin-top: 2px; display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 40px; }
+  /* Figma: RELATED pills are FLAT warm-white capsules — no border, no shadow (measured) */
+  #sheet .rel .pill { font-size: 13px; font-weight: 500; background: #f9f8f6; color: #2c2c2c; padding: 12px 16px;
+    border: 0; border-radius: 999px; line-height: 1.05;
     max-width: 100%; overflow-wrap: anywhere; }
   #sheet .rel .rpill { cursor: pointer; }
   #sheet .rel .rpill:active { background: #eceae3; }
@@ -155,9 +154,10 @@
   }
   #sheet .nodelist { display: flex; flex-direction: column; }
   #sheet .noderow {
-    display: flex; align-items: baseline; gap: 12px; padding: 19px 2px; cursor: pointer;
+    display: flex; align-items: baseline; gap: 12px; padding: 19px 0; cursor: pointer;
     border-top: 1px solid #d9d8d3;
   }
+  #sheet .noderow:first-child { border-top: 0; }   /* design: no rule above the first row */
   #sheet .noderow:active { background: rgba(0,0,0,.04); }
   #sheet .noderow .rname { flex: 1; font-size: 15.5px; color: #0f0f0f; line-height: 1.35; overflow-wrap: anywhere; }
   #sheet .noderow .rcat { font-size: 11px; letter-spacing: .6px; text-transform: uppercase; color: #999; white-space: nowrap; }
@@ -177,7 +177,10 @@
     display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: -10px; }
   #search .sfield { position: relative; flex: 1; }
   #search input { width: 100%; height: 40px; font-size: 14px; letter-spacing: -.14px; padding: 0 46px 0 16px;
-    border-radius: 999px; border: 0; background: rgba(255,255,255,.10); color: #fff;
+    border-radius: 999px; border: 1px solid transparent; color: #fff;
+    /* glass rim: gradient hairline lives in the border-box layer, fill in the padding-box layer */
+    background: linear-gradient(rgba(255,255,255,.10), rgba(255,255,255,.10)) padding-box,
+                linear-gradient(180deg, rgba(255,255,255,.42), rgba(255,255,255,.06) 58%, rgba(255,255,255,.16)) border-box;
     box-shadow: 0 14px 24px rgba(0,0,0,.05); font-family: inherit; outline: none; }
   #search input::placeholder { color: rgba(255,255,255,.4); }
   #search .sglass { position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
@@ -311,7 +314,7 @@ const THEMES = {
     bg: 0x0f0f0f, fog: 0.0008,
     nodeDot: 0xffffff,                     // Figma: every node is a white glowing dot (no per-category colour)
     line: 0x6f6480, lineOpacity: 0.24, hierOpacity: 0.10,
-    lineHi: 0x9d92ba, lineHiOpacity: 0.8,
+    lineHi: 0xffffff, lineHiOpacity: 0.8,
     nodeEmissive: 0.85, catEmissive: 0.95,
     glow: true, glowOpacity: 0.30, glowBlend: THREE.AdditiveBlending,
     star: true, starColor: 0x3a3d48, starOpacity: 0.5,
@@ -322,7 +325,7 @@ const THEMES = {
     bg: 0xefeee9, fog: 0.00055,
     nodeDot: 0x17181a,
     line: 0x8a8170, lineOpacity: 0.32, hierOpacity: 0.16,
-    lineHi: 0xf87f06, lineHiOpacity: 0.8,
+    lineHi: 0x0f0f0f, lineHiOpacity: 0.8,
     nodeEmissive: 0.0, catEmissive: 0.0,
     glow: false, glowOpacity: 0.0, glowBlend: THREE.NormalBlending,
     star: false, starColor: 0xcfcabd, starOpacity: 0.0,
