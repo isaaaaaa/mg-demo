@@ -14,11 +14,16 @@
     --accent: #7d8aa8;
     --amber: #e08a37;
   }
+  @font-face {
+    font-family: 'Zalando Sans';
+    font-weight: 100 900; font-style: normal; font-display: swap;
+    src: url('zalando-sans-var.woff2') format('woff2');
+  }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0; height: 100%; width: 100%;
     overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Helvetica Neue", sans-serif;
+    font-family: "Zalando Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Helvetica Neue", sans-serif;
     color: #e9eaf0;
     overscroll-behavior: none;
   }
@@ -83,7 +88,7 @@
     display: flex; align-items: center; justify-content: center; pointer-events: none;
   }
   #tbTitle {
-    font-size: 13px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase;
+    font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
     color: #fff; pointer-events: auto; user-select: none; -webkit-user-select: none; padding: 10px 14px;
   }
   #searchBtn {
@@ -131,9 +136,9 @@
     overflow-wrap: anywhere;
   }
   /* category sheet: sans count title + uppercase category subtitle (Figma "25 memories / ORGANIZATION") */
-  #sheet h1.cnt { font-family: inherit; font-weight: 600; font-size: 26px; letter-spacing: -.3px; margin-bottom: 6px; }
+  #sheet h1.cnt { font-family: inherit; font-weight: 600; font-size: 26px; letter-spacing: -.3px; margin-bottom: 8px; }
   #sSub { display: none; text-align: center; font-size: 12px; font-weight: 600; letter-spacing: 1px;
-    text-transform: uppercase; color: #696866; margin: -20px 4px 24px; }   /* tucks under the count title */
+    text-transform: uppercase; color: #696866; margin: 0 4px 24px; }
   #sSub.show { display: block; }
   #sheet .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 22px; }
   #sheet .mpill { font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px; display: flex; align-items: center; gap: 6px; background: #e7e4dd; color: #3a3c42; }
@@ -177,10 +182,7 @@
     display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: -10px; }
   #search .sfield { position: relative; flex: 1; }
   #search input { width: 100%; height: 40px; font-size: 14px; letter-spacing: -.14px; padding: 0 46px 0 16px;
-    border-radius: 999px; border: 1px solid transparent; color: #fff;
-    /* glass rim: gradient hairline lives in the border-box layer, fill in the padding-box layer */
-    background: linear-gradient(rgba(255,255,255,.10), rgba(255,255,255,.10)) padding-box,
-                linear-gradient(180deg, rgba(255,255,255,.42), rgba(255,255,255,.06) 58%, rgba(255,255,255,.16)) border-box;
+    border-radius: 999px; border: 0; background: rgba(255,255,255,.10); color: #fff;
     box-shadow: 0 14px 24px rgba(0,0,0,.05); font-family: inherit; outline: none; }
   #search input::placeholder { color: rgba(255,255,255,.4); }
   #search .sglass { position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
@@ -1247,7 +1249,7 @@ function openSheet(n){
   const body = document.getElementById('sheetBody'); body.innerHTML = '';
 
   const rel = relatedNodes(n);
-  body.append(secttlEl(`Related (${rel.length})`));
+  body.append(secttlEl('Related'));
   const r = elm('div','rel');
   rel.slice(0, 30).forEach(o => {
     const p = elm('span','pill rpill'); p.textContent = o.name;
@@ -1277,7 +1279,9 @@ function openCategorySheet(cat){
   cat.nodes.slice().sort((a,b) => (b.degree||0) - (a.degree||0)).forEach(nd => {
     const row = elm('div','noderow');
     const nm = elm('span','rname'); nm.textContent = nd.name;
-    const rc = elm('span','rcat'); rc.textContent = nd._catKey ? catLabel(nd._catKey) : '';
+    const rc = elm('span','rcat');
+    const deg = nd.degree != null ? nd.degree : 0;
+    rc.textContent = `${deg} connection${deg === 1 ? '' : 's'}`;
     row.append(nm, rc);
     row.addEventListener('click', () => openSheet(nd));
     list.append(row);
