@@ -131,7 +131,11 @@
     font-size: 26px; letter-spacing: .2px; text-align: center; margin: 0 24px 16px; color: #0f0f0f;
     overflow-wrap: anywhere;
   }
-  #sheet h1.catz { text-transform: uppercase; }
+  /* category sheet: sans count title + uppercase category subtitle (Figma "25 memories / ORGANIZATION") */
+  #sheet h1.cnt { font-family: inherit; font-weight: 600; font-size: 26px; letter-spacing: -.3px; margin-bottom: 6px; }
+  #sSub { display: none; text-align: center; font-size: 12px; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; color: #696866; margin: 0 24px 14px; }
+  #sSub.show { display: block; }
   #sheet .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 22px; }
   #sheet .mpill { font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px; display: flex; align-items: center; gap: 6px; background: #e7e4dd; color: #3a3c42; }
   #sheet .mpill .swatch { width: 8px; height: 8px; border-radius: 50%; }
@@ -151,14 +155,12 @@
   }
   #sheet .nodelist { display: flex; flex-direction: column; }
   #sheet .noderow {
-    display: flex; align-items: center; gap: 10px; padding: 11px 4px; cursor: pointer;
-    border-top: 1px solid rgba(0,0,0,.07);
+    display: flex; align-items: baseline; gap: 12px; padding: 19px 2px; cursor: pointer;
+    border-top: 1px solid #d9d8d3;
   }
   #sheet .noderow:active { background: rgba(0,0,0,.04); }
-  #sheet .noderow .rname { flex: 1; font-size: 15px; color: #0f0f0f; line-height: 1.35; overflow-wrap: anywhere; }
-  #sheet .noderow .rdeg { font-size: 12px; color: rgba(15,15,15,.4); font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; }
-  #sheet .listhdr { display:flex; justify-content:space-between; align-items:baseline; font-size:11px; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:#0f0f0f; margin:0 0 6px; }
-  #sheet .listhdr .hr { color:rgba(15,15,15,.4); }
+  #sheet .noderow .rname { flex: 1; font-size: 15.5px; color: #0f0f0f; line-height: 1.35; overflow-wrap: anywhere; }
+  #sheet .noderow .rcat { font-size: 11px; letter-spacing: .6px; text-transform: uppercase; color: #999; white-space: nowrap; }
 
   /* light theme — keep the chrome light too so the whole background reads light */
   body.theme-light #panel { background: linear-gradient(180deg, rgba(239,238,233,.96), rgba(239,238,233,0)); }
@@ -174,9 +176,9 @@
   #searchBack { width: 40px; height: 44px; border: 0; background: transparent; color: #fff; flex: 0 0 auto;
     display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: -10px; }
   #search .sfield { position: relative; flex: 1; }
-  #search input { width: 100%; height: 44px; font-size: 15px; padding: 0 46px 0 18px; border-radius: 999px;
-    border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.04); color: #fff;
-    font-family: inherit; outline: none; }
+  #search input { width: 100%; height: 40px; font-size: 14px; letter-spacing: -.14px; padding: 0 46px 0 16px;
+    border-radius: 999px; border: 0; background: rgba(255,255,255,.10); color: #fff;
+    box-shadow: 0 14px 24px rgba(0,0,0,.05); font-family: inherit; outline: none; }
   #search input::placeholder { color: rgba(255,255,255,.4); }
   #search .sglass { position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
     color: rgba(255,255,255,.8); pointer-events: none; }
@@ -194,18 +196,16 @@
   #search .sres .rcat { font-size: 10.5px; letter-spacing: .6px; text-transform: uppercase;
     color: rgba(255,255,255,.5); white-space: nowrap; }
   /* empty ("Find a Memory") + no-results states */
-  #searchEmpty, #searchNone { display: none; flex-direction: column; align-items: center; text-align: center; padding-top: 13vh; }
+  #searchEmpty, #searchNone { display: none; flex-direction: column; align-items: center; text-align: center; padding-top: 52px; }
   #search.stateEmpty #searchEmpty { display: flex; }
   #search.stateNone  #searchNone  { display: flex; }
-  #search .neb { width: 210px; height: 126px; }
-  #search .neb.small { width: 150px; height: 90px; }
-  #search .neb svg { width: 100%; height: 100%; }
-  #searchEmpty h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: 26px; color: #fff; margin: 28px 0 12px; }
-  #searchEmpty p { font-size: 13px; color: rgba(255,255,255,.55); line-height: 1.55; margin: 0; }
-  #searchNone p { font-family: Georgia, "Times New Roman", serif; font-size: 14.5px; color: rgba(255,255,255,.6); line-height: 1.6; margin: 24px 0 0; }
-  #searchNone .askv { margin-top: 44px; width: 100%; max-width: 360px; height: 52px; border-radius: 999px;
-    border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.05); color: #fff;
-    font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; cursor: pointer; }
+  #search .neb { width: 236px; height: 183px; mix-blend-mode: lighten; }
+  #search .neb.small { width: 156px; height: 121px; }
+  #search .neb img { width: 100%; height: 100%; object-fit: cover; }
+  #searchEmpty h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; font-size: 24px; letter-spacing: -1.2px; color: #fff; margin: 33px 0 20px; }
+  #searchEmpty p, #searchNone p { font-family: Georgia, "Times New Roman", serif; font-size: 14px; letter-spacing: -.56px;
+    color: #fff; line-height: 1.3; margin: 0; max-width: 252px; }
+  #searchNone p { margin-top: 26px; }
 
   #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #6a6d80; font-size: 13px; z-index: 40; pointer-events: none; }
 </style>
@@ -237,14 +237,13 @@
     <div id="searchBody">
       <div id="searchResults"></div>
       <div id="searchEmpty">
-        <div class="neb"></div>
+        <div class="neb"><img src="search-nebula.png" alt="" /></div>
         <h2>Find a Memory</h2>
         <p>Search for specific memories by<br/>keywords or categories.</p>
       </div>
       <div id="searchNone">
-        <div class="neb small"></div>
-        <p>Sorry, no stories were found.<br/>Please search again or chat with<br/>VONDER for further assistance.</p>
-        <button class="askv">ASK VONDER</button>
+        <div class="neb small"><img src="search-nebula.png" alt="" /></div>
+        <p>Sorry, no stories were found.</p>
       </div>
     </div>
   </div>
@@ -259,6 +258,7 @@
     <div id="sheetHead">
       <div class="gwrap"><div class="gbar"></div></div>
       <h1 id="sTitle"></h1>
+      <div id="sSub"></div>
     </div>
     <div id="sheetBody"></div>
   </div>
@@ -539,7 +539,7 @@ function setCategoryLanguage(lang){
     it.w = null; it.h = null;
   });
   cullDirty = true;
-  if (sheetOpen && selectedCat) document.getElementById('sTitle').textContent = catLabel(selectedCat);
+  if (sheetOpen && selectedCat) document.getElementById('sSub').textContent = catLabel(selectedCat);
   return true;
 }
 window.setCategoryLanguage = setCategoryLanguage;
@@ -1239,7 +1239,8 @@ function secttlEl(txt){ const d = elm('div','secttl'); d.textContent = txt; retu
 function openSheet(n){
   setSelected(n, null);
   const st = document.getElementById('sTitle');
-  st.textContent = n.name; st.classList.remove('catz');   // memory names keep their original casing
+  st.textContent = n.name; st.classList.remove('cnt');    // memory names keep their original casing (serif title)
+  document.getElementById('sSub').classList.remove('show');
   const body = document.getElementById('sheetBody'); body.innerHTML = '';
 
   const rel = relatedNodes(n);
@@ -1264,19 +1265,17 @@ function openSheet(n){
 function openCategorySheet(cat){
   setSelected(null, cat);
   const st = document.getElementById('sTitle');
-  st.textContent = catLabel(cat); st.classList.add('catz');   // categories are always UPPERCASE (i18n-aware)
+  st.textContent = `${cat.nodes.length} memories`; st.classList.add('cnt');   // Figma: sans count title…
+  const sub = document.getElementById('sSub');
+  sub.textContent = catLabel(cat); sub.classList.add('show');                 // …+ UPPERCASE category subtitle (i18n-aware)
   const body = document.getElementById('sheetBody'); body.innerHTML = '';
 
-  const hd = elm('div','listhdr');
-  const hl = elm('span'); hl.textContent = `Nodes (${cat.nodes.length})`;
-  const hr = elm('span','hr'); hr.textContent = 'Connections';
-  hd.append(hl, hr); body.append(hd);
   const list = elm('div','nodelist');
   cat.nodes.slice().sort((a,b) => (b.degree||0) - (a.degree||0)).forEach(nd => {
     const row = elm('div','noderow');
     const nm = elm('span','rname'); nm.textContent = nd.name;
-    const dg = elm('span','rdeg'); dg.textContent = nd.degree != null ? nd.degree : '';
-    row.append(nm, dg);
+    const rc = elm('span','rcat'); rc.textContent = nd._catKey ? catLabel(nd._catKey) : '';
+    row.append(nm, rc);
     row.addEventListener('click', () => openSheet(nd));
     list.append(row);
   });
@@ -1339,18 +1338,6 @@ document.getElementById('searchClear').addEventListener('click', () => {
   const i = document.getElementById('searchInput'); i.value = ''; renderSearch(''); i.focus();
 });
 document.getElementById('searchInput').addEventListener('input', e => renderSearch(e.target.value));
-// procedural stand-in for the Figma dotted-nebula illustration (tilted elliptical dot swirl)
-document.querySelectorAll('#search .neb').forEach(el => {
-  let dots = '';
-  for (let i = 0; i < 170; i++){
-    const t = Math.random() * Math.PI * 2;
-    const r = 0.34 + 0.66 * Math.pow(Math.random(), 0.6);            // annulus — sparse dark core
-    const x = 100 + Math.cos(t) * 92 * r, y = 60 + Math.sin(t) * 34 * r + Math.cos(t * 2) * 4;
-    const rad = (Math.random() * 1.05 + 0.35) * (1.15 - r * 0.5);
-    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(2)}" opacity="${(0.25 + Math.random() * 0.65).toFixed(2)}"/>`;
-  }
-  el.innerHTML = `<svg viewBox="0 0 200 120" fill="#fff" style="transform:rotate(-14deg)">${dots}</svg>`;
-});
 
 
 
