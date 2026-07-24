@@ -91,7 +91,14 @@
     height: calc(env(safe-area-inset-top) + 52px);
     padding: env(safe-area-inset-top) 6px 0;
     display: flex; align-items: center; justify-content: center; pointer-events: none;
+    background: #0f0f0f;                          /* solid mask behind the title (per Figma toolbar) */
   }
+  #topbar::after {                                 /* soft tail so the graph fades out under the bar */
+    content: ''; position: absolute; top: 100%; left: 0; right: 0; height: 38px; pointer-events: none;
+    background: linear-gradient(180deg, #0f0f0f, rgba(15,15,15,0));
+  }
+  body.theme-light #topbar { background: #efeee9; }
+  body.theme-light #topbar::after { background: linear-gradient(180deg, #efeee9, rgba(239,238,233,0)); }
   #tbTitle {
     font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
     color: #fff; pointer-events: auto; user-select: none; -webkit-user-select: none; padding: 10px 14px;
@@ -320,7 +327,7 @@ const THEMES = {
   dark: {
     bg: 0x0f0f0f, fog: 0.0008,
     nodeDot: 0xffffff,                     // Figma: every node is a white glowing dot (no per-category colour)
-    line: 0x6f6480, lineOpacity: 0.24, hierOpacity: 0.10,
+    line: 0xffffff, lineOpacity: 0.22, hierOpacity: 0.09,   // design lines are WHITE at low alpha — no colour cast
     lineHi: 0xffffff, lineHiOpacity: 0.8,
     nodeEmissive: 0.85, catEmissive: 0.95,
     glow: true, glowOpacity: 0.30, glowBlend: THREE.AdditiveBlending,
@@ -453,7 +460,7 @@ function buildData(spread){
  * -------------------------------------------------------------------- */
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));   // full-res on 3x phones — the 2x cap was the main source of jaggies on hi-lines
 renderer.setSize(innerWidth, innerHeight);
 
 const labelRenderer = new CSS2DRenderer({ element: document.getElementById('labels') });
