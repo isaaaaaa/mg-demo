@@ -970,7 +970,7 @@ function stepIntro(){
   // the rest join. Once everyone is aboard (k=0.50) the shell spins at full completeness for a
   // beat, then the whole formation is flung (tightly staggered) outward, unwinding the remaining
   // rotation into the final layout. Arrive/orbit/fling moments interleave → no global valley.
-  const TH = 0 * Math.PI * (1 - _envG(k, 0.40, 0.60));      // swirl OFF for evaluation (was 1.05π — knob kept, set to 0)
+  const TH = 1.05 * Math.PI * (1 - _envG(k, 0.40, 0.60));   // swirl: cruise peak while the shell is complete
   intro.items.forEach(it => {
     if (k < K_FLING){
       const e = _sstep(_stag(k / K_ASM, it.j));              // e=1 ⇒ riding the rotating shell
@@ -987,7 +987,7 @@ function stepIntro(){
   if (t > INTRO_T.total) labelsEl.style.opacity = 1;         // settle: capsules fade in
   if (t > INTRO_T.total + INTRO_T.tail) finishIntro();
 }
-const K_ASM = 0.50, K_FLING = 0.55;                          // all aboard by 0.50; release at 0.55
+const K_ASM = 0.50, K_FLING = 0.50;                          // all aboard by 0.50; release immediately (zero dwell)
 // generalized slow-fast-slow progress: cubic ramp to a cruise band [a,b], quartic-decay tail
 function _envG(k, a, b){
   if (k <= 0) return 0;
