@@ -932,7 +932,7 @@ function updateDepth(){
 let baseLineMats = [];
 let intro = null, introJustSkipped = false;
 const labelsEl = document.getElementById('labels');
-const INTRO_T = { total: 148, tail: 20 };   // one continuous gesture ≈ 2.5s + settle
+const INTRO_P = { total: 148, tail: 20, ball: 0.30, turns: 1.05, kAsm: 0.50, kFling: 0.46, stagA: 0.18, stagF: 0.12, fade: 48 };   // runtime-tunable via intro-tuner.html
 const introCamDir = new THREE.Vector3(0.35, 0.45, 1).normalize();
 function runIntro(){
   if (!nodeMeshes.length || matchMedia('(prefers-reduced-motion: reduce)').matches){
@@ -950,7 +950,7 @@ function runIntro(){
     const it = {
       m, fin: m.userData.data.pos.clone(), j: hash01(id + 't'),               // fin from the authoritative layout (re-runnable any time)
       scatter: dir.multiplyScalar(R * (0.55 + 0.6 * j2)),                      // loose cloud, inside the boot framing
-      ball: fibDir(i, arr.length).multiplyScalar(R * 0.30 * (0.8 + 0.2 * j3)), // the condensed globe (~1/3 scale)
+      ball: fibDir(i, arr.length).multiplyScalar(R * INTRO_P.ball * (0.8 + 0.2 * j3)), // the condensed globe
     };
     m.position.copy(it.scatter);
     items.push(it);
@@ -965,23 +965,23 @@ function runIntro(){
 function stepIntro(){
   if (!intro) return;
   const t = ++intro.t, fit = window._fitDist || boundingRadius * 3;
-  intro.fade = _eIO(Math.min(1, t / 48));                    // opening fade-in, overlapping the drift-in
-  const k = Math.min(1, t / INTRO_T.total);
+  intro.fade = _eIO(Math.min(1, t / Math.max(1, INTRO_P.fade)));   // opening fade-in, overlapping the drift-in
+  const k = Math.min(1, t / INTRO_P.total);
   // Orbit-until-assembled: every node flies (staggered) toward its slot on a ROTATING sphere —
   // arrival hands its radial speed to the shared orbit, so early arrivals circle the shell while
   // the rest join. Once everyone is aboard (k=0.50) the shell spins at full completeness for a
   // beat, then the whole formation is flung (tightly staggered) outward, unwinding the remaining
   // rotation into the final layout. Arrive/orbit/fling moments interleave → no global valley.
-  const TH = 1.05 * Math.PI * (1 - _envG(k, 0.40, 0.60));   // swirl: cruise peak while the shell is complete
+  const TH = INTRO_P.turns * Math.PI * (1 - _envG(k, 0.40, 0.60));   // swirl: cruise peak while the shell is complete
   intro.items.forEach(it => {
-    if (k < K_FLING){
-      const e = _sstep(_stag(k / K_ASM, it.j));              // e=1 ⇒ riding the rotating shell
+    if (k < INTRO_P.kFling){
+      const e = _sstep(_stag(k / INTRO_P.kAsm, it.j));       // e=1 ⇒ riding the rotating shell
       _pos.copy(it.ball).applyAxisAngle(_swirlAxis, TH);
       it.m.position.lerpVectors(it.scatter, _pos, e);
     } else {
       // stragglers keep flying in while the release pulls everyone out — no snap, paths blend
-      const e = _sstep(_stag(Math.min(1, k / K_ASM), it.j));
-      const g = _glide(_stagF((k - K_FLING) / (1 - K_FLING), it.j));
+      const e = _sstep(_stag(Math.min(1, k / INTRO_P.kAsm), it.j));
+      const g = _glide(_stagF((k - INTRO_P.kFling) / (1 - INTRO_P.kFling), it.j));
       _pos2.copy(it.ball).applyAxisAngle(_swirlAxis, TH);
       _pos2.lerpVectors(it.scatter, _pos2, e);                       // current in-flight point (world)
       _pos.lerpVectors(it.ball, it.fin, g).applyAxisAngle(_swirlAxis, TH);   // where the fling wants it
@@ -991,10 +991,9 @@ function stepIntro(){
   camera.position.copy(introCamDir).multiplyScalar(fit * (0.85 + 0.15 * _eIO(k)));   // one single pull
   const lf = Math.max(0, Math.min(1, (k - 0.66) / 0.22));    // edges fade in during the glide-out
   baseLineMats.forEach((mt, i) => mt.opacity = (i === 0 ? theme.hierOpacity : theme.lineOpacity) * lf);
-  if (t > INTRO_T.total) labelsEl.style.opacity = 1;         // settle: capsules fade in
-  if (t > INTRO_T.total + INTRO_T.tail) finishIntro();
+  if (t > INTRO_P.total) labelsEl.style.opacity = 1;         // settle: capsules fade in
+  if (t > INTRO_P.total + INTRO_P.tail) finishIntro();
 }
-const K_ASM = 0.50, K_FLING = 0.46;                          // release at ~60% aboard of the tighter band — ball stage halved
 // generalized slow-fast-slow progress: cubic ramp to a cruise band [a,b], quartic-decay tail
 function _envG(k, a, b){
   if (k <= 0) return 0;
@@ -1007,8 +1006,8 @@ function _envG(k, a, b){
 }
 const _swirlAxis = new THREE.Vector3(0.25, 1, 0.12).normalize();
 const _pos = new THREE.Vector3(), _pos2 = new THREE.Vector3();
-const _stag  = (k, j) => Math.min(1, Math.max(0, (k - 0.18 * j) / 0.82));   // approach: ±18% offsets — halved assembly band
-const _stagF = (k, j) => Math.min(1, Math.max(0, (k - 0.12 * j) / 0.88));   // fling: tighter, reads collective
+const _stag  = (k, j) => Math.min(1, Math.max(0, (k - INTRO_P.stagA * j) / (1 - INTRO_P.stagA)));   // approach stagger
+const _stagF = (k, j) => Math.min(1, Math.max(0, (k - INTRO_P.stagF * j) / (1 - INTRO_P.stagF)));   // fling stagger
 const _sstep = x => x * x * (3 - 2 * x);                                    // zero-slope landing INTO the orbit
 const _glide = x => _envG(x, 0.25, 0.35);   // release ramps over ~1/4 of the window, then the long quartic glide
 const _eIO  = x => x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
@@ -1463,7 +1462,7 @@ const curSpread = 1.0, curFit = 0.5;   // fixed: spread 1.0×, initial zoom 0.5�
 let autoRotate = true;                 // fixed ON at overview (still pauses while reading/focusing)
 
 // the old preset row now holds a category legend, filled once data loads
-const APP_VERSION = 'v0725-1';
+const APP_VERSION = 'v0725-2';
 document.getElementById('verTag').textContent = APP_VERSION;
 // dev console lives behind a DOUBLE-TAP on the top-bar title (no visible chrome for it)
 { let tbT = 0;
@@ -1568,7 +1567,7 @@ function loadDataset(key){
     .catch(err => { clearTimeout(timer); console.warn('load failed:', ds.url, err); ld.style.display = 'flex'; ld.classList.add('err'); });
 }
 
-window._dbg = { camera, controls, scene, openSheet, openCategorySheet, focusCategory, relatedNodes, nodeInComfortZone, runIntro, finishIntro, stepIntro, get intro(){ return intro && intro.t; }, get RAW(){ return RAW; }, get tween(){ return !!tween; }, get g2(){ return g2 && { ...g2, fingers: g2P.size }; }, set simVP(v){ simVP = v; }, get sheetPos(){ return { open: sheetOpen, full: sheet.classList.contains('full'), ty: Math.round(sheetTy()) }; },
+window._dbg = { camera, controls, scene, openSheet, openCategorySheet, focusCategory, relatedNodes, nodeInComfortZone, runIntro, finishIntro, stepIntro, introP: INTRO_P, get intro(){ return intro && intro.t; }, get RAW(){ return RAW; }, get tween(){ return !!tween; }, get g2(){ return g2 && { ...g2, fingers: g2P.size }; }, set simVP(v){ simVP = v; }, get sheetPos(){ return { open: sheetOpen, full: sheet.classList.contains('full'), ty: Math.round(sheetTy()) }; },
   cat(key){ return RAW.cats.find(c => c.key === key || c.name === key); },
   get hiEdges(){ return hiLine ? hiLine.geometry.attributes.instanceStart.count : 0; },
   get hiState(){ return { pending: !!hiPending, fadeIn: +hiFadeIn.toFixed(2), old: hiOld.length, bridge: !!hiBridge,
