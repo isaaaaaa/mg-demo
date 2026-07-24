@@ -229,10 +229,19 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
   }
   #loading .ldGlyph { width: 46px; height: 46px; color: #fff; animation: ldBreath 1.5s ease-in-out infinite alternate; }
-  @keyframes ldBreath { from { opacity: .2; } to { opacity: .4; } }
+  @keyframes ldBreath { from { opacity: 0; } to { opacity: .4; } }
   #loading .ldErr { display: none; font-size: 13px; color: rgba(255,255,255,.55); text-align: center; line-height: 1.7; }
   #loading.err .ldGlyph { animation: none; opacity: .3; }
   #loading.err .ldErr { display: block; }
+  #loading .ldTitle {                              /* same spot & style as the real top-bar title */
+    position: absolute; top: 0; left: 0; right: 0; height: calc(env(safe-area-inset-top) + 52px);
+    padding-top: env(safe-area-inset-top); display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #fff;
+  }
+  body.theme-light #loading .ldTitle { color: #17181a; }
+  /* search stays hidden through loading + the boot intro, then fades in */
+  #searchBtn { opacity: 0; pointer-events: none !important; transition: opacity .6s; }
+  body.ready #searchBtn { opacity: 1; pointer-events: auto !important; }
   body.theme-light #loading { background: #efeee9; }
   body.theme-light #loading .ldGlyph { color: #0f0f0f; }
   body.theme-light #loading .ldErr { color: rgba(15,15,15,.55); }
@@ -293,6 +302,7 @@
   </div>
 
   <div id="loading">
+    <div class="ldTitle">Memory Graph</div>
     <svg class="ldGlyph" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
       <path d="M29 14 Q29 27 42 27 Q29 27 29 40 Q29 27 16 27 Q29 27 29 14 Z"/>
       <path d="M13 6 Q13 12 19 12 Q13 12 13 18 Q13 12 7 12 Q13 12 13 6 Z"/>
@@ -587,6 +597,7 @@ window.setCategoryLanguage = setCategoryLanguage;
 function makeCap(text, cls){
   const d = document.createElement('div');
   d.className = 'cap ' + cls;
+  d.style.opacity = 0;                 // born invisible — the LOD fade loop owns opacity from here
   if (cls === 'cat') { d.innerHTML = ''; } // filled by caller
   else d.textContent = text;
   return d;
@@ -923,8 +934,10 @@ const introCamDir = new THREE.Vector3(0.35, 0.45, 1).normalize();
 const easeIntroIO  = k => k < .5 ? 4*k*k*k : 1 - Math.pow(-2*k + 2, 3)/2;
 const easeIntroOut = k => 1 - Math.pow(1 - k, 3);
 function runIntro(){
-  if (!nodeMeshes.length) return;
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!nodeMeshes.length || matchMedia('(prefers-reduced-motion: reduce)').matches){
+    document.body.classList.add('ready');        // no intro → chrome shows immediately
+    return;
+  }
   if (isFinite(camera.position.x) && camera.position.lengthSq() > 1) introCamDir.copy(camera.position).normalize();
   const R = boundingRadius, items = [];
   [...nodeMeshes, ...catMeshes].forEach((m, i, arr) => {
@@ -956,12 +969,12 @@ function stepIntro(){
     const e = easeIntroIO(t / conv);
     intro.items.forEach(it => it.m.position.lerpVectors(it.scatter, it.ball, e));
     camera.position.copy(introCamDir).multiplyScalar(fit * 0.85);   // enforced: resizes must not yank the boot camera
-  } else if (t <= conv + hold){                              // ② 小球（轻微呼吸）
-    const b = 1 + 0.02 * Math.sin((t - conv) * 0.24);
+  } else if (t <= conv + hold){                              // ② 小球（单次轻呼吸，首尾都精确归位）
+    const b = 1 + 0.018 * Math.sin(Math.PI * (t - conv) / hold);
     intro.items.forEach(it => it.m.position.copy(it.ball).multiplyScalar(b));
     camera.position.copy(introCamDir).multiplyScalar(fit * 0.85);
-  } else if (t <= conv + hold + expl){                       // ③ 炸开 + 相机拉远
-    const k = (t - conv - hold) / expl, e = easeIntroOut(k);
+  } else if (t <= conv + hold + expl){                       // ③ 炸开 + 相机拉远（从静止平滑加速）
+    const k = (t - conv - hold) / expl, e = easeIntroIO(k);
     intro.items.forEach(it => it.m.position.lerpVectors(it.ball, it.fin, e));
     camera.position.copy(introCamDir).multiplyScalar(fit * (0.85 + 0.15 * easeIntroIO(k)));
     const lf = Math.max(0, (k - 0.55) / 0.45);               // edges fade in near the end of the burst
@@ -974,11 +987,13 @@ function finishIntro(){
   if (!intro) return;
   intro.items.forEach(it => it.m.position.copy(it.fin));
   baseLineMats.forEach((mt, i) => mt.opacity = i === 0 ? theme.hierOpacity : theme.lineOpacity);
-  labelsEl.style.opacity = 1;
   camera.position.copy(introCamDir).multiplyScalar(window._fitDist || boundingRadius * 3);
   controls.target.set(0, 0, 0);
-  controls.enabled = true; autoRotate = true; cullDirty = true;
+  controls.enabled = true; autoRotate = true;
   intro = null;
+  cullDirty = true; lastDecideT = -1e9;          // fresh LOD pass first…
+  labelsEl.style.opacity = 1;                    // …then reveal (elements fade in individually)
+  document.body.classList.add('ready');          // search icon may appear now
 }
 renderer.domElement.addEventListener('pointerdown', () => { if (intro){ finishIntro(); introJustSkipped = true; } });
 
