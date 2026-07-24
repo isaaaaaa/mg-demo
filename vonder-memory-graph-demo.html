@@ -929,7 +929,7 @@ function updateDepth(){
 let baseLineMats = [];
 let intro = null, introJustSkipped = false;
 const labelsEl = document.getElementById('labels');
-const INTRO_T = { total: 175, tail: 20 };   // one continuous gesture ≈ 2.9s + settle
+const INTRO_T = { total: 148, tail: 20 };   // one continuous gesture ≈ 2.5s + settle
 const introCamDir = new THREE.Vector3(0.35, 0.45, 1).normalize();
 function runIntro(){
   if (!nodeMeshes.length || matchMedia('(prefers-reduced-motion: reduce)').matches){
@@ -969,7 +969,7 @@ function stepIntro(){
   // strongly mid-peaked progress curve, so the angular speed follows the same slow-fast-slow arc,
   // Θ hits exactly 0 at the end (final layout lands exact), and the explosion inherits the spin.
   const S = k < .5 ? 16*k*k*k*k*k : 1 - 16*Math.pow(1 - k, 5);
-  const TH = 2 * Math.PI * (1 - S);                          // one full turn total → ~190° inside the ball window
+  const TH = 1.4 * Math.PI * (1 - S);                        // 252° total → ~133° inside the ball window
   const CONV = 0.44, BALL = 0.58;                            // master-clock bands
   intro.items.forEach(it => {
     if (k <= CONV){                                          // ① 慢入 → 加速冲向球
