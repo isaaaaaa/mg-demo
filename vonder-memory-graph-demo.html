@@ -932,7 +932,7 @@ function updateDepth(){
 let baseLineMats = [];
 let intro = null, introJustSkipped = false;
 const labelsEl = document.getElementById('labels');
-const INTRO_P = { total: 148, tail: 20, ball: 0.30, turns: 1.05, kAsm: 0.50, kFling: 0.46, stagA: 0.18, stagF: 0.12, fade: 48 };   // runtime-tunable via intro-tuner.html
+const INTRO_P = { total: 176, tail: 20, ball: 0.12, turns: 2.25, kAsm: 0.44, kFling: 0.25, stagA: 0.20, stagF: 0.25 };   // isa 手调定稿 2026-07-25；runtime-tunable via intro-tuner.html
 const introCamDir = new THREE.Vector3(0.35, 0.45, 1).normalize();
 function runIntro(){
   if (!nodeMeshes.length || matchMedia('(prefers-reduced-motion: reduce)').matches){
@@ -965,14 +965,14 @@ function runIntro(){
 function stepIntro(){
   if (!intro) return;
   const t = ++intro.t, fit = window._fitDist || boundingRadius * 3;
-  intro.fade = _eIO(Math.min(1, t / Math.max(1, INTRO_P.fade)));   // opening fade-in, overlapping the drift-in
+  intro.fade = _fadeCurve(t / INTRO_P.total);                // 0→0%, 90f→40%, 140f→80%, ~165f→100% (@176f)
   const k = Math.min(1, t / INTRO_P.total);
   // Orbit-until-assembled: every node flies (staggered) toward its slot on a ROTATING sphere —
   // arrival hands its radial speed to the shared orbit, so early arrivals circle the shell while
   // the rest join. Once everyone is aboard (k=0.50) the shell spins at full completeness for a
   // beat, then the whole formation is flung (tightly staggered) outward, unwinding the remaining
   // rotation into the final layout. Arrive/orbit/fling moments interleave → no global valley.
-  const TH = INTRO_P.turns * Math.PI * (1 - _envG(k, 0.40, 0.60));   // swirl: cruise peak while the shell is complete
+  const TH = -INTRO_P.turns * Math.PI * (1 - _envG(k, 0.40, 0.60));  // negative: swirl runs the SAME way as auto-rotate (measured)
   intro.items.forEach(it => {
     if (k < INTRO_P.kFling){
       const e = _sstep(_stag(k / INTRO_P.kAsm, it.j));       // e=1 ⇒ riding the rotating shell
@@ -995,6 +995,17 @@ function stepIntro(){
   if (t > INTRO_P.total + INTRO_P.tail) finishIntro();
 }
 // generalized slow-fast-slow progress: cubic ramp to a cruise band [a,b], quartic-decay tail
+function _fadeCurve(x){
+  const A = [[0, 0], [0.51, 0.4], [0.795, 0.8], [0.94, 1]];
+  if (x >= 0.94) return 1;
+  for (let i = 1; i < A.length; i++){
+    if (x <= A[i][0]){
+      const p0 = A[i-1], p1 = A[i];
+      return p0[1] + (p1[1] - p0[1]) * (x - p0[0]) / (p1[0] - p0[0]);
+    }
+  }
+  return 1;
+}
 function _envG(k, a, b){
   if (k <= 0) return 0;
   if (k >= 1) return 1;
@@ -1462,7 +1473,7 @@ const curSpread = 1.0, curFit = 0.5;   // fixed: spread 1.0×, initial zoom 0.5�
 let autoRotate = true;                 // fixed ON at overview (still pauses while reading/focusing)
 
 // the old preset row now holds a category legend, filled once data loads
-const APP_VERSION = 'v0725-2';
+const APP_VERSION = 'v0725-3';
 document.getElementById('verTag').textContent = APP_VERSION;
 // dev console lives behind a DOUBLE-TAP on the top-bar title (no visible chrome for it)
 { let tbT = 0;
