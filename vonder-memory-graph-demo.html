@@ -83,6 +83,7 @@
   }
   #datasetTabs button.on { background: var(--accent); color: #fff; }
   #panel.hidden { transform: translateY(-102%); }
+  #verTag { margin-top: 8px; font-size: 10.5px; letter-spacing: .4px; color: rgba(255,255,255,.35); font-variant-numeric: tabular-nums; }
   .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
   /* ---- top bar (Figma: centred uppercase title + search at right; double-tap title = console) ---- */
@@ -290,6 +291,7 @@
     <div class="row">
       <div id="datasetTabs"></div>
     </div>
+    <div id="verTag"></div>
   </div>
 
   <div id="sheet">
@@ -992,7 +994,7 @@ function stepIntro(){
   if (t > INTRO_T.total) labelsEl.style.opacity = 1;         // settle: capsules fade in
   if (t > INTRO_T.total + INTRO_T.tail) finishIntro();
 }
-const K_ASM = 0.50, K_FLING = 0.44;                          // release at ~60% aboard — visible in/out interleave
+const K_ASM = 0.50, K_FLING = 0.46;                          // release at ~60% aboard of the tighter band — ball stage halved
 // generalized slow-fast-slow progress: cubic ramp to a cruise band [a,b], quartic-decay tail
 function _envG(k, a, b){
   if (k <= 0) return 0;
@@ -1005,7 +1007,7 @@ function _envG(k, a, b){
 }
 const _swirlAxis = new THREE.Vector3(0.25, 1, 0.12).normalize();
 const _pos = new THREE.Vector3(), _pos2 = new THREE.Vector3();
-const _stag  = (k, j) => Math.min(1, Math.max(0, (k - 0.35 * j) / 0.65));   // approach: ±35% offsets — assembly reads progressive
+const _stag  = (k, j) => Math.min(1, Math.max(0, (k - 0.18 * j) / 0.82));   // approach: ±18% offsets — halved assembly band
 const _stagF = (k, j) => Math.min(1, Math.max(0, (k - 0.12 * j) / 0.88));   // fling: tighter, reads collective
 const _sstep = x => x * x * (3 - 2 * x);                                    // zero-slope landing INTO the orbit
 const _glide = x => _envG(x, 0.25, 0.35);   // release ramps over ~1/4 of the window, then the long quartic glide
@@ -1461,6 +1463,8 @@ const curSpread = 1.0, curFit = 0.5;   // fixed: spread 1.0×, initial zoom 0.5�
 let autoRotate = true;                 // fixed ON at overview (still pauses while reading/focusing)
 
 // the old preset row now holds a category legend, filled once data loads
+const APP_VERSION = 'v0725-1';
+document.getElementById('verTag').textContent = APP_VERSION;
 // dev console lives behind a DOUBLE-TAP on the top-bar title (no visible chrome for it)
 { let tbT = 0;
   document.getElementById('tbTitle').addEventListener('click', () => {
