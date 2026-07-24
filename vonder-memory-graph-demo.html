@@ -228,7 +228,7 @@
     position: fixed; inset: 0; z-index: 40; background: #0f0f0f; pointer-events: none;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
   }
-  #loading .ldGlyph { width: 46px; height: 46px; color: #fff; animation: ldBreath 1.5s ease-in-out infinite alternate; }
+  #loading .ldGlyph { width: 46px; height: 42px; color: #fff; animation: ldBreath 1.5s ease-in-out infinite alternate; }
   @keyframes ldBreath { from { opacity: 0; } to { opacity: .4; } }
   #loading .ldErr { display: none; font-size: 13px; color: rgba(255,255,255,.55); text-align: center; line-height: 1.7; }
   #loading.err .ldGlyph { animation: none; opacity: .3; }
@@ -303,10 +303,10 @@
 
   <div id="loading">
     <div class="ldTitle">Memory Graph</div>
-    <svg class="ldGlyph" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
-      <path d="M23.5 4.3 Q25.81 11.71 34 13.8 Q25.81 15.89 23.5 23.3 Q21.19 15.89 13 13.8 Q21.19 11.71 23.5 4.3 Z"/>
-      <path d="M10.5 24.7 Q12.81 32.11 21 34.2 Q12.81 36.29 10.5 43.7 Q8.19 36.29 0 34.2 Q8.19 32.11 10.5 24.7 Z"/>
-      <path d="M36.4 24.7 Q38.71 32.11 46.9 34.2 Q38.71 36.29 36.4 43.7 Q34.09 36.29 25.9 34.2 Q34.09 32.11 36.4 24.7 Z"/>
+    <svg class="ldGlyph" viewBox="0 0 49 45" fill="none" aria-hidden="true">
+      <path d="M24.2624 0L26.5447 6.67498C26.9032 7.72279 27.7329 8.5507 28.7808 8.91106L35.4557 11.1933L28.7808 13.4756C27.7329 13.836 26.905 14.6639 26.5447 15.7117L24.2624 22.3867L21.9801 15.7117C21.6198 14.6639 20.7918 13.836 19.744 13.4756L13.0691 11.1933L19.744 8.91106C20.7918 8.5507 21.6198 7.72279 21.9801 6.67498L24.2624 0Z" fill="currentColor"/>
+      <path d="M37.3167 21.9653L39.5989 28.6403C39.9575 29.6881 40.7872 30.516 41.835 30.8764L48.51 33.1587L41.835 35.4409C40.7872 35.8013 39.9593 36.6292 39.5989 37.677L37.3167 44.352L35.0344 37.677C34.674 36.6292 33.8461 35.8013 32.7983 35.4409L26.1233 33.1587L32.7983 30.8764C33.8461 30.516 34.674 29.6881 35.0344 28.6403L37.3167 21.9653Z" fill="currentColor"/>
+      <path d="M11.1933 21.9653L13.4756 28.6403C13.836 29.6881 14.6639 30.516 15.7117 30.8764L22.3867 33.1587L15.7117 35.4409C14.6639 35.8013 13.836 36.6292 13.4756 37.677L11.1933 44.352L8.91106 37.677C8.5507 36.6292 7.72279 35.8013 6.67498 35.4409L0 33.1587L6.67498 30.8764C7.72279 30.516 8.5507 29.6881 8.91106 28.6403L11.1933 21.9653Z" fill="currentColor"/>
     </svg>
     <div class="ldErr">Unable to load<br/>Please check your Internet.</div>
   </div>
