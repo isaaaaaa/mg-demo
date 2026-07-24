@@ -929,10 +929,8 @@ function updateDepth(){
 let baseLineMats = [];
 let intro = null, introJustSkipped = false;
 const labelsEl = document.getElementById('labels');
-const INTRO_T = { conv: 66, hold: 30, expl: 78, tail: 24 };   // frames ≈ 1.1s · 0.5s · 1.3s · 0.4s
+const INTRO_T = { total: 175, tail: 20 };   // one continuous gesture ≈ 2.9s + settle
 const introCamDir = new THREE.Vector3(0.35, 0.45, 1).normalize();
-const easeIntroIO  = k => k < .5 ? 4*k*k*k : 1 - Math.pow(-2*k + 2, 3)/2;
-const easeIntroOut = k => 1 - Math.pow(1 - k, 3);
 function runIntro(){
   if (!nodeMeshes.length || matchMedia('(prefers-reduced-motion: reduce)').matches){
     document.body.classList.add('ready');        // no intro → chrome shows immediately
@@ -947,7 +945,7 @@ function runIntro(){
     if (dir.lengthSq() < 1e-4) dir.set(0, 1, 0);
     dir.normalize();
     const it = {
-      m, fin: m.position.clone(), j: hash01(id + 't'),                         // per-node stagger phase
+      m, fin: m.userData.data.pos.clone(), j: hash01(id + 't'),               // fin from the authoritative layout (re-runnable any time)
       scatter: dir.multiplyScalar(R * (0.55 + 0.6 * j2)),                      // loose cloud, inside the boot framing
       ball: fibDir(i, arr.length).multiplyScalar(R * 0.30 * (0.8 + 0.2 * j3)), // the condensed globe (~1/3 scale)
     };
@@ -963,41 +961,45 @@ function runIntro(){
 }
 function stepIntro(){
   if (!intro) return;
-  const { conv, hold, expl, tail } = INTRO_T;
   const t = ++intro.t, fit = window._fitDist || boundingRadius * 3;
-  const T2 = conv + hold, T3 = T2 + expl, T4 = T3 + tail;
-  // Nothing ever fully stops: the ball keeps a slow shared swirl through every phase, each node
-  // runs on its own slightly offset clock (stagger), and the camera moves on ONE continuous
-  // curve — that's what removes the "segmented" feel.
-  const swirl = 0.0045 * Math.min(t, T3);
-  const breath = (t > conv && t <= T2) ? 1 + 0.018 * Math.sin(Math.PI * (t - conv) / hold) : 1;
+  const k = Math.min(1, t / INTRO_T.total);
+  // ONE gesture, slow-fast-slow: converge ACCELERATES into the ball, the ball is the energy peak
+  // (a fast half-turn, no scaling), the burst is FLUNG out of the spin and decelerates into place.
+  // Implementation: a global rotation Θ(k) = Θtotal·(1−S(k)) is applied to every position; S is a
+  // strongly mid-peaked progress curve, so the angular speed follows the same slow-fast-slow arc,
+  // Θ hits exactly 0 at the end (final layout lands exact), and the explosion inherits the spin.
+  const S = k < .5 ? 16*k*k*k*k*k : 1 - 16*Math.pow(1 - k, 5);
+  const TH = 2 * Math.PI * (1 - S);                          // one full turn total → ~190° inside the ball window
+  const CONV = 0.44, BALL = 0.58;                            // master-clock bands
   intro.items.forEach(it => {
-    _ballRot.copy(it.ball).applyAxisAngle(_swirlAxis, swirl).multiplyScalar(breath);
-    if (t <= conv){                                          // ① 汇聚（错峰到达，落点本身在缓转）
-      const e = easeIntroIO(_stag(t / conv, it.j));
-      it.m.position.lerpVectors(it.scatter, _ballRot, e);
-    } else if (t <= T2){                                     // ② 活着的小球（旋转 + 单次轻呼吸）
-      it.m.position.copy(_ballRot);
-    } else {                                                 // ③ 炸开（错峰出发，出发点仍在旋转 → 无缝）
-      const e = easeIntroIO(_stag((t - T2) / expl, it.j));
-      it.m.position.lerpVectors(_ballRot, it.fin, e);
+    if (k <= CONV){                                          // ① 慢入 → 加速冲向球
+      const e = _eIn(_stag(k / CONV, it.j));
+      _pos.lerpVectors(it.scatter, it.ball, e);
+    } else if (k <= BALL){                                   // ② 球体 = 速度峰值（纯旋转，无缩放）
+      _pos.copy(it.ball);
+    } else {                                                 // ③ 甩出（先释放后长减速）→ 慢出到位
+      const e = _eFling(_stag((k - BALL) / (1 - BALL), it.j));
+      _pos.lerpVectors(it.ball, it.fin, e);
     }
+    it.m.position.copy(_pos.applyAxisAngle(_swirlAxis, TH));
   });
-  // camera: slow push-in through ①② (0.88→0.85), pull-back through ③ (0.85→1.0) — C¹ at the joint
-  const camK = t <= T2 ? 0.88 - 0.03 * easeIntroIO(t / T2)
-                       : 0.85 + 0.15 * easeIntroIO(Math.min(1, (t - T2) / expl));
+  // camera: one continuous curve — slight push-in through the wind-up, pull-back with the burst
+  const camK = k <= BALL ? 0.88 - 0.03 * _eIO(k / BALL)
+                         : 0.85 + 0.15 * _eIO((k - BALL) / (1 - BALL));
   camera.position.copy(introCamDir).multiplyScalar(fit * camK);
-  if (t > T2){
-    const k = Math.min(1, (t - T2) / expl);
-    const lf = Math.max(0, (k - 0.55) / 0.45);               // edges fade in near the end of the burst
-    baseLineMats.forEach((mt, i) => mt.opacity = (i === 0 ? theme.hierOpacity : theme.lineOpacity) * lf);
-  }
-  if (t > T3) labelsEl.style.opacity = 1;                    // settle: capsules fade in
-  if (t > T4) finishIntro();
+  const lf = Math.max(0, Math.min(1, (k - 0.78) / 0.18));    // edges fade in while the burst settles
+  baseLineMats.forEach((mt, i) => mt.opacity = (i === 0 ? theme.hierOpacity : theme.lineOpacity) * lf);
+  if (t > INTRO_T.total) labelsEl.style.opacity = 1;         // settle: capsules fade in
+  if (t > INTRO_T.total + INTRO_T.tail) finishIntro();
 }
 const _swirlAxis = new THREE.Vector3(0.25, 1, 0.12).normalize();
-const _ballRot = new THREE.Vector3();
+const _pos = new THREE.Vector3();
 const _stag = (k, j) => Math.min(1, Math.max(0, (k - 0.25 * j) / 0.75));   // ±25% per-node clock offset
+const _eIn  = x => x * x * x;
+const _eOut = x => 1 - Math.pow(1 - x, 3);
+// fling: a ~15% smooth "release" ramp out of the spin, then the long cubic deceleration
+const _eFling = x => { const a = Math.min(1, x / 0.15), g = a * a * (3 - 2 * a); return g * _eOut(x); };
+const _eIO  = x => x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
 function finishIntro(){
   if (!intro) return;
   intro.items.forEach(it => it.m.position.copy(it.fin));
