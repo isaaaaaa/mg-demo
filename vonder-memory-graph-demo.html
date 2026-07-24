@@ -915,6 +915,7 @@ function updateDepth(){
     if (it.node === selectedNode) op = 1;
     else { const dd = (it.node.pos.distanceTo(cam) - focal) / span;   // signed distance from focal plane
       op = dd >= 0 ? 1 - (1-DIM_FAR)*Math.min(1, dd) : 1 - (1-DIM_NEAR)*Math.min(1, -dd); }
+    if (intro) op *= (intro.fade || 0);                      // boot: everything fades up from black
     it.mesh.material.color.copy(it._base).lerp(_bg, 1 - op);
     if (it._glow){ it._glow.visible = op > 0.32; it._glow.material.opacity = theme.glowOpacity * op; }
   }
@@ -962,6 +963,7 @@ function runIntro(){
 function stepIntro(){
   if (!intro) return;
   const t = ++intro.t, fit = window._fitDist || boundingRadius * 3;
+  intro.fade = _eIO(Math.min(1, t / 34));                    // opening fade-in of the whole field
   const k = Math.min(1, t / INTRO_T.total);
   // ONE gesture, slow-fast-slow: converge ACCELERATES into the ball, the ball is the energy peak
   // (a fast half-turn, no scaling), the burst is FLUNG out of the spin and decelerates into place.
@@ -998,7 +1000,7 @@ const _stag = (k, j) => Math.min(1, Math.max(0, (k - 0.25 * j) / 0.75));   // ±
 const _eIn  = x => x * x * x;
 const _eOut = x => 1 - Math.pow(1 - x, 3);
 // fling: a ~15% smooth "release" ramp out of the spin, then the long cubic deceleration
-const _eFling = x => { const a = Math.min(1, x / 0.15), g = a * a * (3 - 2 * a); return g * _eOut(x); };
+const _eFling = x => { const a = Math.min(1, x / 0.15), g = a * a * (3 - 2 * a); return g * (1 - Math.pow(1 - x, 4)); };   // quartic tail — the landing eases out longer
 const _eIO  = x => x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
 function finishIntro(){
   if (!intro) return;
