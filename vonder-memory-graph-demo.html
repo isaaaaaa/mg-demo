@@ -977,8 +977,13 @@ function stepIntro(){
       _pos.copy(it.ball).applyAxisAngle(_swirlAxis, TH);
       it.m.position.lerpVectors(it.scatter, _pos, e);
     } else {
+      // stragglers keep flying in while the release pulls everyone out — no snap, paths blend
+      const e = _sstep(_stag(Math.min(1, k / K_ASM), it.j));
       const g = _glide(_stagF((k - K_FLING) / (1 - K_FLING), it.j));
-      it.m.position.copy(_pos.lerpVectors(it.ball, it.fin, g).applyAxisAngle(_swirlAxis, TH));
+      _pos2.copy(it.ball).applyAxisAngle(_swirlAxis, TH);
+      _pos2.lerpVectors(it.scatter, _pos2, e);                       // current in-flight point (world)
+      _pos.lerpVectors(it.ball, it.fin, g).applyAxisAngle(_swirlAxis, TH);   // where the fling wants it
+      it.m.position.lerpVectors(_pos2, _pos, g);                     // blend in-flight → fling as g grows
     }
   });
   camera.position.copy(introCamDir).multiplyScalar(fit * (0.85 + 0.15 * _eIO(k)));   // one single pull
@@ -987,7 +992,7 @@ function stepIntro(){
   if (t > INTRO_T.total) labelsEl.style.opacity = 1;         // settle: capsules fade in
   if (t > INTRO_T.total + INTRO_T.tail) finishIntro();
 }
-const K_ASM = 0.50, K_FLING = 0.48;                          // release at ~90% aboard — the last stragglers land into the departing formation
+const K_ASM = 0.50, K_FLING = 0.44;                          // release at ~60% aboard — visible in/out interleave
 // generalized slow-fast-slow progress: cubic ramp to a cruise band [a,b], quartic-decay tail
 function _envG(k, a, b){
   if (k <= 0) return 0;
@@ -999,7 +1004,7 @@ function _envG(k, a, b){
   return 1 - M * (1 - b) * q * q * q * q / 4;
 }
 const _swirlAxis = new THREE.Vector3(0.25, 1, 0.12).normalize();
-const _pos = new THREE.Vector3();
+const _pos = new THREE.Vector3(), _pos2 = new THREE.Vector3();
 const _stag  = (k, j) => Math.min(1, Math.max(0, (k - 0.35 * j) / 0.65));   // approach: ±35% offsets — assembly reads progressive
 const _stagF = (k, j) => Math.min(1, Math.max(0, (k - 0.12 * j) / 0.88));   // fling: tighter, reads collective
 const _sstep = x => x * x * (3 - 2 * x);                                    // zero-slope landing INTO the orbit
