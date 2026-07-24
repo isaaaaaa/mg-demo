@@ -224,7 +224,19 @@
     color: #fff; line-height: 1.3; margin: 0; max-width: 252px; }
   #searchNone p { margin-top: 26px; }
 
-  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #6a6d80; font-size: 13px; z-index: 40; pointer-events: none; }
+  #loading {
+    position: fixed; inset: 0; z-index: 40; background: #0f0f0f; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  }
+  #loading .ldGlyph { width: 46px; height: 46px; color: #fff; animation: ldBreath 1.5s ease-in-out infinite alternate; }
+  @keyframes ldBreath { from { opacity: .2; } to { opacity: .4; } }
+  #loading .ldErr { display: none; font-size: 13px; color: rgba(255,255,255,.55); text-align: center; line-height: 1.7; }
+  #loading.err .ldGlyph { animation: none; opacity: .3; }
+  #loading.err .ldErr { display: block; }
+  body.theme-light #loading { background: #efeee9; }
+  body.theme-light #loading .ldGlyph { color: #0f0f0f; }
+  body.theme-light #loading .ldErr { color: rgba(15,15,15,.55); }
+  #labels { transition: opacity .6s; }
 </style>
 </head>
 <body class="theme-dark">
@@ -280,7 +292,18 @@
     <div id="sheetBody"></div>
   </div>
 
-  <div id="loading">loading data…</div>
+  <div id="loading">
+    <svg class="ldGlyph" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
+      <path d="M29 14 Q29 27 42 27 Q29 27 29 40 Q29 27 16 27 Q29 27 29 14 Z"/>
+      <path d="M13 6 Q13 12 19 12 Q13 12 13 18 Q13 12 7 12 Q13 12 13 6 Z"/>
+      <path d="M11 28 Q11 33 16 33 Q11 33 11 38 Q11 33 6 33 Q11 33 11 28 Z"/>
+    </svg>
+    <div class="ldErr">Unable to load<br/>Please check your Internet.</div>
+  </div>
+  <script>
+    // static fallback: if even the module/CDN never boots, still surface the offline hint
+    setTimeout(function(){ var l = document.getElementById('loading'); if (!window._booted && l && l.style.display !== 'none') l.classList.add('err'); }, 16000);
+  </script>
 
 <script type="importmap">
 {
@@ -594,14 +617,17 @@ function buildGraph(data){
     cat.nodes.forEach(n => { hier.push(cat.pos.x,cat.pos.y,cat.pos.z, n.pos.x,n.pos.y,n.pos.z); }); });
   const hg = new THREE.BufferGeometry();
   hg.setAttribute('position', new THREE.Float32BufferAttribute(hier,3));
-  graphGroup.add(new THREE.LineSegments(hg, new THREE.LineBasicMaterial({ color:theme.line, transparent:true, opacity:theme.hierOpacity })));
+  const hierMat = new THREE.LineBasicMaterial({ color:theme.line, transparent:true, opacity:theme.hierOpacity });
+  graphGroup.add(new THREE.LineSegments(hg, hierMat));
 
   // --- relationship links (cross-category + loose-group internal) ---
   const cross = [];
   data.relLinks.forEach(([a,b]) => cross.push(a.pos.x,a.pos.y,a.pos.z, b.pos.x,b.pos.y,b.pos.z));
   const cg = new THREE.BufferGeometry();
   cg.setAttribute('position', new THREE.Float32BufferAttribute(cross,3));
-  graphGroup.add(new THREE.LineSegments(cg, new THREE.LineBasicMaterial({ color:theme.line, transparent:true, opacity:theme.lineOpacity })));
+  const crossMat = new THREE.LineBasicMaterial({ color:theme.line, transparent:true, opacity:theme.lineOpacity });
+  graphGroup.add(new THREE.LineSegments(cg, crossMat));
+  baseLineMats = [hierMat, crossMat];
 
   // --- nodes (grouped + loose) — uniform white glowing dots per the Figma graph style ---
   const dotCol = new THREE.Color(theme.nodeDot);
@@ -883,18 +909,96 @@ function updateDepth(){
   }
 }
 
+/* ----------------------------------------------------------------------
+ * 7b. Boot intro — 三段式：scattered dots CONVERGE into a small ball (~1/2.8 of
+ *     the final graph), hold a beat, then EXPLODE into the real layout while the
+ *     camera pulls back (「汇聚」+「拉远」合并). Edges & capsules fade in at the
+ *     end of the burst. Tap anywhere to skip.
+ * -------------------------------------------------------------------- */
+let baseLineMats = [];
+let intro = null, introJustSkipped = false;
+const labelsEl = document.getElementById('labels');
+const INTRO_T = { conv: 66, hold: 30, expl: 78, tail: 24 };   // frames ≈ 1.1s · 0.5s · 1.3s · 0.4s
+const introCamDir = new THREE.Vector3(0.35, 0.45, 1).normalize();
+const easeIntroIO  = k => k < .5 ? 4*k*k*k : 1 - Math.pow(-2*k + 2, 3)/2;
+const easeIntroOut = k => 1 - Math.pow(1 - k, 3);
+function runIntro(){
+  if (!nodeMeshes.length) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (isFinite(camera.position.x) && camera.position.lengthSq() > 1) introCamDir.copy(camera.position).normalize();
+  const R = boundingRadius, items = [];
+  [...nodeMeshes, ...catMeshes].forEach((m, i, arr) => {
+    const id = String((m.userData.data && (m.userData.data.id || m.userData.data.key)) || i);
+    const j1 = hash01(id + 'a'), j2 = hash01(id + 'b'), j3 = hash01(id + 'c');
+    const dir = new THREE.Vector3(j1 - .5, j2 - .5, j3 - .5);
+    if (dir.lengthSq() < 1e-4) dir.set(0, 1, 0);
+    dir.normalize();
+    const it = {
+      m, fin: m.position.clone(),
+      scatter: dir.multiplyScalar(R * (0.55 + 0.6 * j2)),                      // loose cloud, inside the boot framing
+      ball: fibDir(i, arr.length).multiplyScalar(R * 0.30 * (0.8 + 0.2 * j3)), // the condensed globe (~1/3 scale)
+    };
+    m.position.copy(it.scatter);
+    items.push(it);
+  });
+  baseLineMats.forEach(mt => mt.opacity = 0);
+  labelsEl.style.opacity = 0;
+  controls.enabled = false; autoRotate = false;
+  controls.target.set(0, 0, 0);
+  camera.position.copy(introCamDir).multiplyScalar((window._fitDist || R * 3) * 0.85);
+  intro = { items, t: 0 };
+}
+function stepIntro(){
+  if (!intro) return;
+  const { conv, hold, expl, tail } = INTRO_T;
+  const t = ++intro.t, fit = window._fitDist || boundingRadius * 3;
+  if (t <= conv){                                            // ① 汇聚
+    const e = easeIntroIO(t / conv);
+    intro.items.forEach(it => it.m.position.lerpVectors(it.scatter, it.ball, e));
+    camera.position.copy(introCamDir).multiplyScalar(fit * 0.85);   // enforced: resizes must not yank the boot camera
+  } else if (t <= conv + hold){                              // ② 小球（轻微呼吸）
+    const b = 1 + 0.02 * Math.sin((t - conv) * 0.24);
+    intro.items.forEach(it => it.m.position.copy(it.ball).multiplyScalar(b));
+    camera.position.copy(introCamDir).multiplyScalar(fit * 0.85);
+  } else if (t <= conv + hold + expl){                       // ③ 炸开 + 相机拉远
+    const k = (t - conv - hold) / expl, e = easeIntroOut(k);
+    intro.items.forEach(it => it.m.position.lerpVectors(it.ball, it.fin, e));
+    camera.position.copy(introCamDir).multiplyScalar(fit * (0.85 + 0.15 * easeIntroIO(k)));
+    const lf = Math.max(0, (k - 0.55) / 0.45);               // edges fade in near the end of the burst
+    baseLineMats.forEach((mt, i) => mt.opacity = (i === 0 ? theme.hierOpacity : theme.lineOpacity) * lf);
+  } else if (t <= conv + hold + expl + tail){                // settle: capsules fade in
+    labelsEl.style.opacity = 1;
+  } else finishIntro();
+}
+function finishIntro(){
+  if (!intro) return;
+  intro.items.forEach(it => it.m.position.copy(it.fin));
+  baseLineMats.forEach((mt, i) => mt.opacity = i === 0 ? theme.hierOpacity : theme.lineOpacity);
+  labelsEl.style.opacity = 1;
+  camera.position.copy(introCamDir).multiplyScalar(window._fitDist || boundingRadius * 3);
+  controls.target.set(0, 0, 0);
+  controls.enabled = true; autoRotate = true; cullDirty = true;
+  intro = null;
+}
+renderer.domElement.addEventListener('pointerdown', () => { if (intro){ finishIntro(); introJustSkipped = true; } });
+
 function loop(){
   requestAnimationFrame(loop);
-  stepTween();
-  stepEdgeFade();
-  controls.autoRotate = autoRotate && !pointerDown && !sheetOpen && !tween;
-  controls.update();
+  try {
+    stepTween();
+    stepIntro();
+    stepEdgeFade();
+    controls.autoRotate = autoRotate && !pointerDown && !sheetOpen && !tween;
+    controls.update();
 
-  maybeCull();
-  updateDepth();
+    if (!intro) maybeCull();
+    updateDepth();
 
-  renderer.render(scene, camera);
-  labelRenderer.render(scene, camera);
+    renderer.render(scene, camera);
+    labelRenderer.render(scene, camera);
+  } catch (e) {
+    window._lastErr = String((e && e.stack) || e);   // keep the loop alive; surface the error for debugging
+  }
 }
 
 /* ----------------------------------------------------------------------
@@ -1051,6 +1155,7 @@ let g2 = null;                        // running baseline {d, cx, cy, d0, zoomOn
 let simVP = null;                     // TEMP test hook: {w, h} fake viewport for the 0×0 headless pane
 const g2Right = new THREE.Vector3(), g2Up = new THREE.Vector3(), g2Shift = new THREE.Vector3();
 function g2Apply(){
+  if (intro) return;                    // boot intro owns the camera
   const [a, b] = [...g2P.values()];
   const m = { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x)/2, cy: (a.y + b.y)/2 };
   if (!g2){ g2 = { ...m, d0: m.d, zoomOn: false }; return; }
@@ -1125,6 +1230,8 @@ function hitNode(px, py){
 // upper third (consistent distance) and its sheet opens — see openCategorySheet.
 renderer.domElement.addEventListener('pointerup', e => {
   pointerDown = false;
+  if (intro) return;                                       // intro owns the stage
+  if (introJustSkipped){ introJustSkipped = false; return; }   // the skip tap itself does nothing else
   if (moved > 9 || performance.now()-downT > 500) return; // was a drag, not a tap
 
   // 1) a visible capsule wins
@@ -1398,25 +1505,30 @@ function loadDataset(key){
   curDataset = ds.key;
   buildDatasetTabs();
   const ld = document.getElementById('loading');
-  ld.style.display = 'flex'; ld.textContent = 'loading ' + ds.label + '…';
-  return fetch(ds.url)
+  ld.style.display = 'flex'; ld.classList.remove('err');
+  const ctl = new AbortController();                       // slow network → offline hint after 15s
+  const timer = setTimeout(() => ctl.abort(), 15000);
+  return fetch(ds.url, { signal: ctl.signal })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
     .then(t => {
+      clearTimeout(timer);
       lastRaw = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1));   // tolerate stray prefix / md fences
       RAW = parseSource(lastRaw);
       rebuild(false);
       ld.style.display = 'none';
+      window._booted = true;
+      runIntro();
     })
-    .catch(err => { ld.style.display = 'flex'; ld.textContent = 'Failed to load ' + ds.url + ' — ' + err.message; });
+    .catch(err => { clearTimeout(timer); console.warn('load failed:', ds.url, err); ld.style.display = 'flex'; ld.classList.add('err'); });
 }
 
-window._dbg = { camera, controls, scene, openSheet, openCategorySheet, focusCategory, relatedNodes, nodeInComfortZone, get RAW(){ return RAW; }, get tween(){ return !!tween; }, get g2(){ return g2 && { ...g2, fingers: g2P.size }; }, set simVP(v){ simVP = v; }, get sheetPos(){ return { open: sheetOpen, full: sheet.classList.contains('full'), ty: Math.round(sheetTy()) }; },
+window._dbg = { camera, controls, scene, openSheet, openCategorySheet, focusCategory, relatedNodes, nodeInComfortZone, runIntro, finishIntro, stepIntro, get intro(){ return intro && intro.t; }, get RAW(){ return RAW; }, get tween(){ return !!tween; }, get g2(){ return g2 && { ...g2, fingers: g2P.size }; }, set simVP(v){ simVP = v; }, get sheetPos(){ return { open: sheetOpen, full: sheet.classList.contains('full'), ty: Math.round(sheetTy()) }; },
   cat(key){ return RAW.cats.find(c => c.key === key || c.name === key); },
   get hiEdges(){ return hiLine ? hiLine.geometry.attributes.instanceStart.count : 0; },
   get hiState(){ return { pending: !!hiPending, fadeIn: +hiFadeIn.toFixed(2), old: hiOld.length, bridge: !!hiBridge,
                           op: hiLine ? +hiLine.material.opacity.toFixed(2) : 0 }; },
   get opSpread(){ const o = nodeLabels.map(it=>it.mesh.material.opacity); return { min:+Math.min(...o).toFixed(2), max:+Math.max(...o).toFixed(2) }; },
-  frame(n){ for (let i=0;i<(n||60);i++){ stepTween(); stepEdgeFade(); controls.update(); renderer.render(scene,camera); labelRenderer.render(scene,camera); maybeCull(); updateDepth(); } } };   // TEMP test hook
+  frame(n){ for (let i=0;i<(n||60);i++){ stepTween(); stepIntro(); stepEdgeFade(); controls.update(); renderer.render(scene,camera); labelRenderer.render(scene,camera); if (!intro) maybeCull(); updateDepth(); } } };   // TEMP test hook
 loadDataset(curDataset).then(() => loop());
 </script>
 </body>
